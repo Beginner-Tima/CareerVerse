@@ -1,0 +1,46 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  // url удален отсюда, он теперь в конфиге
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  xp        Int      @default(0)
+  coins     Int      @default(0)
+  level     Int      @default(1)
+  progress  UserProgress[]
+}
+
+model Profession {
+  id          String   @id @default(uuid())
+  title       String
+  description String
+  levels      Level[]
+}
+
+model Level {
+  id           String   @id @default(uuid())
+  professionId String
+  profession   Profession @relation(fields: [professionId], references: [id])
+  order        Int
+  title        String
+  taskData     Json
+  rewardXp     Int
+  rewardCoins  Int
+  progress     UserProgress[]
+}
+
+model UserProgress {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  levelId     String
+  level       Level    @relation(fields: [levelId], references: [id])
+  isCompleted Boolean  @default(false)
+  completedAt DateTime @updatedAt
+}
