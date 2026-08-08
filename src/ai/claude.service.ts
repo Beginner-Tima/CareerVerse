@@ -26,19 +26,54 @@ import * as prompts from './prompts';
 import { DialogueTurn, Learner, Signal } from './prompts';
 
 // Haiku 4.5 — самая дешёвая из актуальных моделей ($1/$5 за млн токенов).
-// На демо этого хватает; поднять до claude-sonnet-5 можно одной переменной .env.
+// На русском её хватает; на казахском — нет, см. ниже.
 const DEFAULT_MODEL = 'claude-haiku-4-5';
+
+/**
+ * На казахском Haiku пишет ломано: «Білмеймін деген сөйлеу нәтиже бермесе,
+ * сөндіктен ойлан да көр» — это не язык, это набор слов. Проверено живым
+ * прогоном 08.08.2026. Для KK берём модель посильнее; 74% выпускников сдают
+ * ЕНТ на казахском, и демо на ломаном языке — худшее, что можно показать жюри.
+ */
+const DEFAULT_MODEL_KK = 'claude-sonnet-5';
+
+// $ за миллион токенов, [вход, выход]. У Sonnet 5 сейчас вводная цена $2/$10,
+// она действует до 31.08.2026 — после этого станет $3/$15.
+const PRICES: Record<string, [number, number]> = {
+  'claude-haiku-4-5': [1, 5],
+  'claude-sonnet-5': [2, 10],
+  'claude-opus-5': [5, 25],
+};
+
+/**
+ * Казахский текст занимает заметно больше токенов, чем русский, и первая же
+ * проба на нём оборвала JSON посреди строки — ответ не влез в лимит и
+ * прохождение упало пятисоткой. Лимиты подняты с запасом на язык.
+ */
+const MAX_TOKENS = {
+  assess: 2000,
+  clarify: 1000,
+  retry: 1000,
+  match: 2000,
+  trial: 3000,
+  followUp: 3000,
+  mentor: 3000,
+  nextSteps: 3000,
+  letter: 3000,
+} as const;
 
 @Injectable()
 export class ClaudeService {
   private readonly logger = new Logger(ClaudeService.name);
   private readonly client: Anthropic;
   readonly model: string;
+  private readonly modelKk: string;
 
   // Грубый счётчик расхода: на хакатоне бюджет ключа маленький,
   // и полезно видеть в логах, во что обходится один прогон.
   private inputTokens = 0;
   private outputTokens = 0;
+  private spentUsd = 0;
 
   constructor() {
     const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -49,6 +84,15 @@ export class ClaudeService {
     }
     this.client = new Anthropic({ apiKey });
     this.model = process.env.ANTHROPIC_MODEL || DEFAULT_MODEL;
+    this.modelKk = process.env.ANTHROPIC_MODEL_KK || DEFAULT_MODEL_KK;
+  }
+
+  /**
+   * Какой моделью говорить на этом языке. Модель пишется в БД к каждому
+   * заданию — маркировка ИИ-контента должна называть настоящую модель.
+   */
+  modelFor(locale: Locale): string {
+    return locale === Locale.KK ? this.modelKk : this.model;
   }
 
   /** Разбор свободного ответа: обратная связь подростку + сигналы интересов. */
@@ -64,8 +108,9 @@ export class ClaudeService {
       AssessmentSchema,
       prompts.SYSTEM_ASSESS(learner),
       prompts.userAssess(params),
-      1024,
+      MAX_TOKENS.assess,
       'assess',
+      learner.locale,
     );
   }
 
@@ -84,8 +129,9 @@ export class ClaudeService {
       ClarifyingQuestionSchema,
       prompts.SYSTEM_CLARIFY(learner),
       prompts.userClarify(params),
-      512,
+      MAX_TOKENS.clarify,
       'clarify',
+      learner.locale,
     );
   }
 
@@ -102,8 +148,9 @@ export class ClaudeService {
       ClarifyingQuestionSchema,
       prompts.SYSTEM_RETRY(learner),
       prompts.userRetry(params),
-      512,
+      MAX_TOKENS.retry,
       'retry',
+      learner.locale,
     );
   }
 
@@ -120,8 +167,9 @@ export class ClaudeService {
       MatchSchema,
       prompts.SYSTEM_MATCH(learner),
       prompts.userMatch(params),
-      1024,
+      MAX_TOKENS.match,
       'match',
+      learner.locale,
     );
   }
 
@@ -139,8 +187,9 @@ export class ClaudeService {
       TrialSchema,
       prompts.SYSTEM_TRIAL(learner),
       prompts.userTrial(params),
-      1500,
+      MAX_TOKENS.trial,
       'trial',
+      learner.locale,
     );
   }
 
@@ -159,8 +208,9 @@ export class ClaudeService {
       TrialFollowUpSchema,
       prompts.SYSTEM_TRIAL_FOLLOWUP(learner),
       prompts.userTrialFollowUp(params),
-      1500,
+      MAX_TOKENS.followUp,
       'trial-followup',
+      learner.locale,
     );
   }
 
@@ -177,8 +227,9 @@ export class ClaudeService {
       MentorReviewSchema,
       prompts.SYSTEM_MENTOR(learner),
       prompts.userMentor(params),
-      2048,
+      MAX_TOKENS.mentor,
       'mentor',
+      learner.locale,
     );
   }
 
@@ -196,8 +247,9 @@ export class ClaudeService {
       NextStepsSchema,
       prompts.SYSTEM_NEXT_STEPS(learner),
       prompts.userNextSteps(params),
-      2048,
+      MAX_TOKENS.nextSteps,
       'next-steps',
+      learner.locale,
     );
   }
 
@@ -213,11 +265,17 @@ export class ClaudeService {
       topProfessions: string[];
     },
   ): AsyncGenerator<string> {
+    const model = this.modelFor(learner.locale);
     const stream = this.client.messages.stream({
-      model: this.model,
-      max_tokens: 2048,
+      model,
+      max_tokens: MAX_TOKENS.letter,
       system: prompts.SYSTEM_PARENT_LETTER(learner),
-      messages: [{ role: 'user', content: prompts.userParentLetter(params) }],
+      messages: [
+        {
+          role: 'user',
+          content: prompts.userParentLetter(params) + prompts.languageTail(learner.locale),
+        },
+      ],
     });
 
     for await (const event of stream) {
@@ -230,7 +288,7 @@ export class ClaudeService {
     }
 
     const final = await stream.finalMessage();
-    this.track('parent-letter', final.usage);
+    this.track('parent-letter', model, final.usage);
   }
 
   private async parse<T>(
@@ -239,17 +297,28 @@ export class ClaudeService {
     user: string,
     maxTokens: number,
     label: string,
+    locale?: Locale,
   ): Promise<T> {
+    const model = this.modelFor(locale ?? Locale.RU);
+
     try {
       const message = await this.client.messages.parse({
-        model: this.model,
+        model,
         max_tokens: maxTokens,
         system,
-        messages: [{ role: 'user', content: user }],
+        // Sonnet 5 думает по умолчанию, а max_tokens покрывает размышления
+        // вместе с ответом — с включённым мышлением JSON обрывался на середине.
+        // Здесь нужен структурированный вывод, а не рассуждения вслух.
+        thinking: { type: 'disabled' },
+        // Требование языка повторяется в самом конце: описания полей схемы
+        // написаны по-русски и тянут ответ в русский, даже когда просили казахский.
+        messages: [
+          { role: 'user', content: user + prompts.languageTail(locale ?? Locale.RU) },
+        ],
         output_config: { format: zodOutputFormat(schema) },
       });
 
-      this.track(label, message.usage);
+      this.track(label, model, message.usage);
 
       if (message.stop_reason === 'refusal') {
         throw new ServiceUnavailableException(
@@ -275,17 +344,21 @@ export class ClaudeService {
     }
   }
 
-  private track(label: string, usage: { input_tokens: number; output_tokens: number }) {
+  private track(
+    label: string,
+    model: string,
+    usage: { input_tokens: number; output_tokens: number },
+  ) {
+    const [inPrice, outPrice] = PRICES[model] ?? PRICES[DEFAULT_MODEL];
     this.inputTokens += usage.input_tokens;
     this.outputTokens += usage.output_tokens;
-    this.logger.log(
-      `${label}: +${usage.input_tokens} in / +${usage.output_tokens} out ` +
-        `(за процесс: ${this.inputTokens} / ${this.outputTokens}, ~$${this.estimateUsd().toFixed(4)})`,
-    );
-  }
+    this.spentUsd +=
+      (usage.input_tokens / 1_000_000) * inPrice +
+      (usage.output_tokens / 1_000_000) * outPrice;
 
-  /** Оценка по прайсу Haiku 4.5: $1 за млн входных, $5 за млн выходных. */
-  private estimateUsd(): number {
-    return (this.inputTokens / 1_000_000) * 1 + (this.outputTokens / 1_000_000) * 5;
+    this.logger.log(
+      `${label} (${model}): +${usage.input_tokens} in / +${usage.output_tokens} out ` +
+        `(за процесс: ${this.inputTokens} / ${this.outputTokens}, ~$${this.spentUsd.toFixed(4)})`,
+    );
   }
 }

@@ -168,7 +168,7 @@ export class SessionsService {
           feedback: assessment.feedback,
           signals: assessment.signals as unknown as Prisma.InputJsonValue,
           scores: verdict as unknown as Prisma.InputJsonValue,
-          modelId: this.claude.model,
+          modelId: this.claude.modelFor(session.locale),
         },
       });
       await tx.interestProfile.update({
@@ -274,7 +274,7 @@ export class SessionsService {
 
     const professions = await this.prisma.profession.findMany({
       where: { id: { in: matches.map((m) => m.professionId) } },
-      select: { id: true, title: true },
+      select: { id: true, title: true, titleKk: true },
     });
 
     const chunks: string[] = [];
@@ -282,7 +282,10 @@ export class SessionsService {
       dialogue: this.dialogueOf(session.tasks),
       signals: this.signalsOf(session.interestProfile?.traits),
       topProfessions: matches
-        .map((m) => professions.find((p) => p.id === m.professionId)?.title)
+        .map((m) => {
+          const found = professions.find((p) => p.id === m.professionId);
+          return found && this.titleOf(found, session.locale);
+        })
         .filter((t): t is string => Boolean(t)),
     })) {
       chunks.push(chunk);
@@ -294,7 +297,7 @@ export class SessionsService {
         sessionId: session.id,
         locale: session.locale,
         content: chunks.join(''),
-        modelId: this.claude.model,
+        modelId: this.claude.modelFor(session.locale),
       },
     });
   }
@@ -412,7 +415,7 @@ export class SessionsService {
           userId,
           content: review as unknown as Prisma.InputJsonValue,
           costCoins: MENTOR_COST_COINS,
-          modelId: this.claude.model,
+          modelId: this.claude.modelFor(session.locale),
         },
       });
 
@@ -462,7 +465,7 @@ export class SessionsService {
     }
 
     const plan = await this.claude.nextSteps(this.learnerOf(session), {
-      professionTitle: profession.title,
+      professionTitle: this.titleOf(profession, session.locale),
       professionDescription: profession.description,
       signals: this.signalsOf(session.interestProfile?.traits),
       context,
@@ -476,9 +479,9 @@ export class SessionsService {
         professionId: profession.id,
         context,
         content,
-        modelId: this.claude.model,
+        modelId: this.claude.modelFor(session.locale),
       },
-      update: { professionId: profession.id, context, content, modelId: this.claude.model },
+      update: { professionId: profession.id, context, content, modelId: this.claude.modelFor(session.locale) },
     });
 
     return {
@@ -554,7 +557,7 @@ export class SessionsService {
           order: nextOrder,
           prompt: retry.question,
           payload: { rationale: retry.rationale, retry: true },
-          modelId: this.claude.model,
+          modelId: this.claude.modelFor(session.locale),
         },
       });
       return {
@@ -583,7 +586,7 @@ export class SessionsService {
           order: nextOrder,
           prompt: question.question,
           payload: { rationale: question.rationale },
-          modelId: this.claude.model,
+          modelId: this.claude.modelFor(session.locale),
         },
       });
       return {
@@ -608,10 +611,18 @@ export class SessionsService {
     signals: Signal[],
     order: number,
   ) {
-    const catalog = await this.prisma.profession.findMany({
+    const stored = await this.prisma.profession.findMany({
       orderBy: { order: 'asc' },
-      select: { id: true, title: true, description: true },
+      select: { id: true, title: true, titleKk: true, description: true },
     });
+
+    // На казахском прохождении русское название профессии посреди экрана
+    // выглядит как недоделка — каталог переводим до того, как он уйдёт в модель.
+    const catalog = stored.map((p) => ({
+      id: p.id,
+      title: this.titleOf(p, session.locale),
+      description: p.description,
+    }));
 
     const { matches } = await this.claude.matchProfessions(learner, {
       catalog,
@@ -654,7 +665,7 @@ export class SessionsService {
             step: 1,
             totalSteps: TRIAL_ROUNDS,
           },
-          modelId: this.claude.model,
+          modelId: this.claude.modelFor(session.locale),
         },
       }),
       this.prisma.interestProfile.update({
@@ -703,7 +714,7 @@ export class SessionsService {
           step: 2,
           totalSteps: TRIAL_ROUNDS,
         },
-        modelId: this.claude.model,
+        modelId: this.claude.modelFor(session.locale),
       },
     });
 
@@ -816,6 +827,14 @@ export class SessionsService {
       confidence: typeof value.confidence === 'number' ? value.confidence : 0,
       missing: typeof value.missing === 'string' ? value.missing : '',
     };
+  }
+
+  /** Казахское название, если оно заведено в каталоге; иначе русское. */
+  private titleOf(
+    profession: { title: string; titleKk: string | null },
+    locale: Locale,
+  ): string {
+    return locale === Locale.KK ? profession.titleKk || profession.title : profession.title;
   }
 
   private professionTitleOf(task: SessionWithRelations['tasks'][number]): string {
