@@ -6,6 +6,11 @@
     "dist",
     "**/*spec.ts",
     "prisma",
-    "prisma.config.ts"
+    "prisma.config.ts",
+    "web",
+    // scripts/ запускается через ts-node и в сборку не входит. Пока он в неё
+    // входил, TypeScript брал общим корнем корень проекта и складывал результат
+    // в dist/src/ — а api/index.js ждёт dist/vercel.js. Прод собрался бы в 404.
+    "scripts"
   ]
 }
