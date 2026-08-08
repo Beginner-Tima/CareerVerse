@@ -53,14 +53,21 @@ export default function ProfessionsPage() {
                       : '—'}
                   </dd>
                 </div>
-                <div>
-                  <dt className="text-xs text-zinc-500">открытых вакансий</dt>
-                  <dd className="text-zinc-200">{p.marketData.vacancyCount ?? '—'}</dd>
-                </div>
-                <div>
-                  <dt className="text-xs text-zinc-500">спрос</dt>
-                  <dd className="text-zinc-200">{p.marketData.demandTrend ?? '—'}</dd>
-                </div>
+                {/* Прочерк рядом с заполненной зарплатой читается как поломка,
+                    а не как «данных нет»: у профессий из широкого каталога этих
+                    двух полей нет вовсе. Экран результата прячет их так же. */}
+                {p.marketData.vacancyCount != null && (
+                  <div>
+                    <dt className="text-xs text-zinc-500">открытых вакансий</dt>
+                    <dd className="text-zinc-200">{p.marketData.vacancyCount}</dd>
+                  </div>
+                )}
+                {p.marketData.demandTrend && (
+                  <div>
+                    <dt className="text-xs text-zinc-500">спрос</dt>
+                    <dd className="text-zinc-200">{p.marketData.demandTrend}</dd>
+                  </div>
+                )}
                 {p.marketData.regions && (
                   <div className="col-span-2 sm:col-span-3">
                     <dt className="text-xs text-zinc-500">где искать</dt>

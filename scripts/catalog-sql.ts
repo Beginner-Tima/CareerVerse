@@ -22,6 +22,24 @@ const professionRows = WIDE_CATALOG.map(
     `  (${q(p.id)}, ${q(p.title)}, ${q(p.titleKk)},\n   ${q(p.description)}, ${100 + i})`,
 ).join(',\n\n');
 
+const withMarket = WIDE_CATALOG.filter((p) => p.market);
+
+/**
+ * id строки рынка труда выводится из id профессии, а не генерируется: колонка
+ * без DEFAULT, а повторный прогон обязан обновлять ту же строку. Если строка уже
+ * заведена сидом со своим uuid, конфликт поймает уникальный professionId и
+ * обновит её, оставив прежний id.
+ */
+const marketRows = withMarket
+  .map(({ id, market: m }) =>
+    [
+      `  (${q(`market-${id}`)}, ${q(id)}, ${m!.medianSalaryKzt},`,
+      `   ${q(JSON.stringify(m!.regions))}::jsonb,`,
+      `   ${q(m!.source)}, ${q(m!.collectedAt.toISOString())})`,
+    ].join('\n'),
+  )
+  .join(',\n\n');
+
 process.stdout.write(`-- Широкий каталог профессий: ${WIDE_CATALOG.length} записей.
 -- ФАЙЛ СГЕНЕРИРОВАН — правьте prisma/catalog.ts и перезапускайте:
 --   npm run catalog:sql > prisma/catalog-expansion.sql
@@ -33,9 +51,11 @@ process.stdout.write(`-- Широкий каталог профессий: ${WID
 --
 -- Идемпотентно: повторный запуск обновит данные, а не создаст дубли.
 --
--- Данных рынка труда здесь нет: поимённой статистики по этим профессиям в
--- открытом виде не существует, а областные медианы выдавать за профессиональные
--- мы отказались. Почему именно — в шапке prisma/catalog.ts.
+-- Рынок труда есть у ${withMarket.length} профессий из ${WIDE_CATALOG.length} — у тех, по которым цифру
+-- удалось собрать поимённо с hh.kz. Заливаются только медиана и порядок
+-- регионов: число вакансий на hh раздувает нечёткий поиск, и в базе его нет.
+-- Остальные профессии остаются без строки в LaborMarketData, и экран результата
+-- честно показывает, что данных нет. Метод сбора — в шапке prisma/catalog.ts.
 
 insert into "Profession" (id, title, "titleKk", description, "order") values
 ${professionRows}
@@ -44,4 +64,17 @@ on conflict (id) do update set
   "titleKk"   = excluded."titleKk",
   description = excluded.description,
   "order"     = excluded."order";
+
+insert into "LaborMarketData"
+  (id, "professionId", "medianSalaryKzt", regions, source, "collectedAt") values
+${marketRows}
+on conflict ("professionId") do update set
+  "medianSalaryKzt" = excluded."medianSalaryKzt",
+  regions           = excluded.regions,
+  source            = excluded.source,
+  "collectedAt"     = excluded."collectedAt",
+  -- Гасим явно: прошлый прогон заливал сюда число вакансий, и без этих двух
+  -- строк оно осталось бы висеть в базе после обновления остальных полей.
+  "vacancyCount"    = null,
+  "demandTrend"     = null;
 `);
