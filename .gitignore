@@ -56,3 +56,8 @@ pids
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 
 /generated/prisma
+.vercel
+.env*
+
+# Шаблон переменных нужен команде — он без значений
+!.env.example

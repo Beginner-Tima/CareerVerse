@@ -7,32 +7,66 @@ datasource db {
   // url удален отсюда, он теперь в конфиге
 }
 
+// ---------------------------------------------------------------------------
+// Справочник: профессии и их уровни-шаблоны
+// ---------------------------------------------------------------------------
+
 model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  xp        Int      @default(0)
-  coins     Int      @default(0)
-  level     Int      @default(1)
-  progress  UserProgress[]
+  id       String         @id @default(uuid())
+  email    String         @unique
+  xp       Int            @default(0)
+  coins    Int            @default(0)
+  level    Int            @default(1)
+  progress UserProgress[]
+  sessions Session[]
 }
 
 model Profession {
-  id          String   @id @default(uuid())
+  id          String  @id @default(uuid())
   title       String
+  titleKk     String?
   description String
-  levels      Level[]
+  // Порядок выдачи в каталоге. Без него дашборд сортировал по алфавиту.
+  order       Int     @default(0)
+
+  levels        Level[]
+  tasks         TaskInstance[]
+  marketData    LaborMarketData?
 }
 
+// Данные рынка труда РК для экрана результатов. Выгрузка локальная
+// (enbek.kz не дёргается вживую на сцене), но источник и дата фиксируются —
+// на вопрос жюри «откуда цифра» должен быть ответ.
+model LaborMarketData {
+  id           String     @id @default(uuid())
+  professionId String     @unique
+  profession   Profession @relation(fields: [professionId], references: [id], onDelete: Cascade)
+
+  medianSalaryKzt Int?
+  vacancyCount    Int?
+  demandTrend     String?
+  regions         Json?
+  source          String
+  collectedAt     DateTime
+}
+
+// Level — это ШАБЛОН, а не конкретное задание: профессия, тема, порядок.
+// Само задание рождается под подростка и живёт в TaskInstance.
 model Level {
-  id           String   @id @default(uuid())
+  id           String     @id @default(uuid())
   professionId String
   profession   Profession @relation(fields: [professionId], references: [id])
   order        Int
   title        String
+  // Тема и подсказка для генератора задания — не текст задания.
+  topic        String?
+  promptHint   String?
   taskData     Json
   rewardXp     Int
   rewardCoins  Int
-  progress     UserProgress[]
+
+  progress UserProgress[]
+  tasks    TaskInstance[]
 }
 
 model UserProgress {
@@ -42,5 +76,138 @@ model UserProgress {
   levelId     String
   level       Level    @relation(fields: [levelId], references: [id])
   isCompleted Boolean  @default(false)
-  completedAt DateTime @updatedAt
+  // Было @updatedAt — время правки строки, а не прохождения уровня.
+  completedAt DateTime @default(now())
+
+  // Замок против гонки начисления наград: 8 параллельных POST на один уровень
+  // давали 7 записей и 1400 XP вместо 200.
+  @@unique([userId, levelId])
+}
+
+// ---------------------------------------------------------------------------
+// Прохождение теста: сессия, задания, ответы, оценки
+// ---------------------------------------------------------------------------
+
+enum Locale {
+  RU
+  KK
+}
+
+enum SessionStatus {
+  IN_PROGRESS
+  COMPLETED
+  ABANDONED
+}
+
+enum TaskKind {
+  // Уточняющий вопрос, рождённый из предыдущего свободного ответа
+  CLARIFYING_QUESTION
+  // Рабочая проба профессии
+  PROFESSION_TRIAL
+}
+
+// Прохождение целиком. userId необязателен: демо для жюри открывается по
+// ссылке без логина, но та же сессия привязывается к User, если он вошёл.
+model Session {
+  id     String        @id @default(uuid())
+  userId String?
+  user   User?         @relation(fields: [userId], references: [id])
+  locale Locale        @default(RU)
+  status SessionStatus @default(IN_PROGRESS)
+
+  // Закон РК № 230-VIII (с 18.01.2026): согласие на обработку ИИ фиксируется.
+  consentAcceptedAt DateTime?
+
+  startedAt   DateTime  @default(now())
+  completedAt DateTime?
+  updatedAt   DateTime  @updatedAt
+
+  tasks           TaskInstance[]
+  interestProfile InterestProfile?
+  parentLetter    ParentLetter?
+
+  @@index([userId])
+}
+
+// Экземпляр задания, сгенерированный под конкретное прохождение.
+// professionId/levelId пустые у уточняющих вопросов — они не привязаны к профессии.
+model TaskInstance {
+  id        String  @id @default(uuid())
+  sessionId String
+  session   Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  kind  TaskKind
+  order Int
+
+  professionId String?
+  profession   Profession? @relation(fields: [professionId], references: [id])
+  levelId      String?
+  level        Level?      @relation(fields: [levelId], references: [id])
+
+  // Текст задания, показанный подростку, и материалы к нему.
+  prompt  String
+  payload Json?
+
+  // Маркировка сгенерированного контента — требование того же закона.
+  modelId     String
+  generatedAt DateTime @default(now())
+
+  answer Answer?
+
+  @@unique([sessionId, order])
+  @@index([sessionId])
+}
+
+// Свободный ответ подростка. Ключа ответов у теста нет — оценивает модель.
+model Answer {
+  id             String       @id @default(uuid())
+  taskInstanceId String       @unique
+  taskInstance   TaskInstance @relation(fields: [taskInstanceId], references: [id], onDelete: Cascade)
+
+  text        String
+  submittedAt DateTime @default(now())
+
+  assessment Assessment?
+}
+
+// Разбор ответа моделью: обратная связь подростку + извлечённые сигналы,
+// которые накапливаются в InterestProfile и определяют следующий вопрос.
+model Assessment {
+  id       String @id @default(uuid())
+  answerId String @unique
+  answer   Answer @relation(fields: [answerId], references: [id], onDelete: Cascade)
+
+  summary  String
+  feedback String
+  // [{ trait: "systems-thinking", weight: 0.7, evidence: "..." }]
+  signals  Json
+  scores   Json?
+
+  modelId   String
+  createdAt DateTime @default(now())
+}
+
+// То, что делает тест адаптивным: накопленный профиль интересов сессии.
+model InterestProfile {
+  id        String  @id @default(uuid())
+  sessionId String  @unique
+  session   Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  traits           Json
+  topProfessions   Json?
+  confidence       Float    @default(0)
+  updatedAt        DateTime @updatedAt
+}
+
+// Письмо родителям — отдельный артефакт, его отдают наружу.
+model ParentLetter {
+  id        String  @id @default(uuid())
+  sessionId String  @unique
+  session   Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  locale  Locale @default(RU)
+  content String
+
+  modelId   String
+  createdAt DateTime @default(now())
 }

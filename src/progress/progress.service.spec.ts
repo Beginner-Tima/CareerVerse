@@ -1,9 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { ConflictException, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { ProgressService } from './progress.service';
 import { PrismaService } from '../prisma/prisma.service';
 
-// Фабрика мока PrismaService — полный контроль над каждым delegate
+// Фабрика мока PrismaService — полный контроль над каждым delegate.
+// $transaction интерактивный: получает колбэк и передаёт ему тот же мок в роли tx.
 const mockPrismaService = () => ({
   level: {
     findUnique: jest.fn(),
@@ -13,11 +15,20 @@ const mockPrismaService = () => ({
     update: jest.fn(),
   },
   userProgress: {
-    findFirst: jest.fn(),
     create: jest.fn(),
   },
   $transaction: jest.fn(),
 });
+
+const duplicateKeyError = () =>
+  new Prisma.PrismaClientKnownRequestError(
+    'Unique constraint failed on the fields: (`userId`,`levelId`)',
+    {
+      code: 'P2002',
+      clientVersion: 'test',
+      meta: { target: ['userId', 'levelId'] },
+    },
+  );
 
 describe('ProgressService', () => {
   let service: ProgressService;
@@ -32,7 +43,13 @@ describe('ProgressService', () => {
     }).compile();
 
     service = module.get<ProgressService>(ProgressService);
-    prisma = module.get(PrismaService) as unknown as ReturnType<typeof mockPrismaService>;
+    prisma = module.get(PrismaService) as unknown as ReturnType<
+      typeof mockPrismaService
+    >;
+
+    prisma.$transaction.mockImplementation((cb: (tx: unknown) => unknown) =>
+      cb(prisma),
+    );
   });
 
   const dto = {
@@ -63,7 +80,6 @@ describe('ProgressService', () => {
   it('should complete level, create progress, and return reward', async () => {
     prisma.level.findUnique.mockResolvedValue(mockLevel);
     prisma.user.findUnique.mockResolvedValue(mockUser);
-    prisma.userProgress.findFirst.mockResolvedValue(null);
 
     const mockProgress = {
       id: 'progress-uuid',
@@ -71,9 +87,8 @@ describe('ProgressService', () => {
       levelId: dto.levelId,
       isCompleted: true,
     };
-    const mockUpdatedUser = { ...mockUser, xp: 100, coins: 50 };
-
-    prisma.$transaction.mockResolvedValue([mockProgress, mockUpdatedUser]);
+    prisma.userProgress.create.mockResolvedValue(mockProgress);
+    prisma.user.update.mockResolvedValue({ ...mockUser, xp: 100, coins: 50 });
 
     const result = await service.completeLevel(dto);
 
@@ -83,29 +98,56 @@ describe('ProgressService', () => {
       user: { id: mockUser.id, xp: 100, coins: 50 },
     });
 
-    // Проверяем что $transaction был вызван с массивом из двух промисов
+    // Вся работа — внутри одной интерактивной транзакции
     expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(prisma.$transaction.mock.calls[0][0]).toBeInstanceOf(Function);
   });
 
-  // ─── ДУБЛИКАТ ПРОГРЕССА → BadRequestException ──────────────
+  // ─── ДУБЛИКАТ ЛОВИТ УНИКАЛЬНЫЙ ИНДЕКС → ConflictException ───
 
-  it('should throw BadRequestException if user already completed this level', async () => {
+  it('should throw ConflictException when the unique index rejects a duplicate', async () => {
     prisma.level.findUnique.mockResolvedValue(mockLevel);
     prisma.user.findUnique.mockResolvedValue(mockUser);
-    prisma.userProgress.findFirst.mockResolvedValue({
-      id: 'existing-progress',
-      userId: dto.userId,
-      levelId: dto.levelId,
-      isCompleted: true,
-    });
+    prisma.userProgress.create.mockRejectedValue(duplicateKeyError());
 
-    await expect(service.completeLevel(dto)).rejects.toThrow(BadRequestException);
+    await expect(service.completeLevel(dto)).rejects.toThrow(ConflictException);
     await expect(service.completeLevel(dto)).rejects.toThrow(
       `User "${dto.userId}" has already completed level "${dto.levelId}"`,
     );
 
-    // $transaction НЕ должен был вызываться
-    expect(prisma.$transaction).not.toHaveBeenCalled();
+    // Награда не начисляется: update даже не дошёл до вызова
+    expect(prisma.user.update).not.toHaveBeenCalled();
+  });
+
+  // ─── ГОНКА: ПАРАЛЛЕЛЬНЫЕ ЗАПРОСЫ ───────────────────────────
+
+  it('should award exactly once when 8 requests race on the same level', async () => {
+    prisma.level.findUnique.mockResolvedValue(mockLevel);
+    prisma.user.findUnique.mockResolvedValue(mockUser);
+
+    // Индекс пропускает первый INSERT, остальные отбивает P2002
+    let inserts = 0;
+    prisma.userProgress.create.mockImplementation(() => {
+      inserts += 1;
+      return inserts === 1
+        ? Promise.resolve({ id: 'progress-uuid', ...dto, isCompleted: true })
+        : Promise.reject(duplicateKeyError());
+    });
+    prisma.user.update.mockResolvedValue({ ...mockUser, xp: 100, coins: 50 });
+
+    const results = await Promise.allSettled(
+      Array.from({ length: 8 }, () => service.completeLevel(dto)),
+    );
+
+    expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
+    expect(prisma.user.update).toHaveBeenCalledTimes(1);
+    results
+      .filter((r) => r.status === 'rejected')
+      .forEach((r) =>
+        expect((r as PromiseRejectedResult).reason).toBeInstanceOf(
+          ConflictException,
+        ),
+      );
   });
 
   // ─── НЕСУЩЕСТВУЮЩИЙ УРОВЕНЬ → NotFoundException ────────────
@@ -132,17 +174,17 @@ describe('ProgressService', () => {
     await expect(service.completeLevel(dto)).rejects.toThrow(
       `User with id "${dto.userId}" not found`,
     );
+
+    expect(prisma.userProgress.create).not.toHaveBeenCalled();
   });
 
-  // ─── ОТКАТ $transaction ПРИ ОШИБКЕ НАЧИСЛЕНИЯ ─────────────
+  // ─── ОТКАТ ТРАНЗАКЦИИ ПРИ ОШИБКЕ НАЧИСЛЕНИЯ ────────────────
 
-  it('should propagate error if $transaction fails (DB rollback)', async () => {
+  it('should propagate error if the reward update fails (DB rollback)', async () => {
     prisma.level.findUnique.mockResolvedValue(mockLevel);
     prisma.user.findUnique.mockResolvedValue(mockUser);
-    prisma.userProgress.findFirst.mockResolvedValue(null);
-
-    // Prisma $transaction бросает ошибку — например, constraint violation при update
-    prisma.$transaction.mockRejectedValue(
+    prisma.userProgress.create.mockResolvedValue({ id: 'progress-uuid' });
+    prisma.user.update.mockRejectedValue(
       new Error('Transaction failed: could not update user coins'),
     );
 
@@ -150,28 +192,24 @@ describe('ProgressService', () => {
       'Transaction failed: could not update user coins',
     );
 
-    // Подтверждаем что $transaction был вызван (и БД откатила обе операции)
     expect(prisma.$transaction).toHaveBeenCalledTimes(1);
   });
 
   // ─── ПОРЯДОК ВЫЗОВОВ ───────────────────────────────────────
 
-  it('should call checks in correct order: level → user → existing → transaction', async () => {
+  it('should call checks in correct order: level → user → create → update', async () => {
     prisma.level.findUnique.mockResolvedValue(mockLevel);
     prisma.user.findUnique.mockResolvedValue(mockUser);
-    prisma.userProgress.findFirst.mockResolvedValue(null);
-    prisma.$transaction.mockResolvedValue([{}, { ...mockUser, xp: 100, coins: 50 }]);
+    prisma.userProgress.create.mockResolvedValue({ id: 'progress-uuid' });
+    prisma.user.update.mockResolvedValue({ ...mockUser, xp: 100, coins: 50 });
 
     await service.completeLevel(dto);
 
-    const callOrder = [
+    [
       prisma.level.findUnique,
       prisma.user.findUnique,
-      prisma.userProgress.findFirst,
-      prisma.$transaction,
-    ];
-
-    // Каждый мок должен быть вызван ровно по одному разу
-    callOrder.forEach((fn) => expect(fn).toHaveBeenCalledTimes(1));
+      prisma.userProgress.create,
+      prisma.user.update,
+    ].forEach((fn) => expect(fn).toHaveBeenCalledTimes(1));
   });
 });

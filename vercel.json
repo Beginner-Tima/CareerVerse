@@ -1,0 +1,15 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "prisma generate && nest build",
+  "installCommand": "npm install",
+  "framework": null,
+  "outputDirectory": "public",
+  "functions": {
+    "api/index.js": {
+      "includeFiles": "dist/**",
+      "maxDuration": 60,
+      "memory": 1024
+    }
+  },
+  "rewrites": [{ "source": "/(.*)", "destination": "/api" }]
+}

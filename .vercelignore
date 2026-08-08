@@ -1,0 +1,6 @@
+# Не тащим в функцию то, что ей не нужно
+test
+src/**/*.spec.ts
+coverage
+.env
+.env.local
