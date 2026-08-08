@@ -1,21 +1,33 @@
 'use client';
 
+import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AiBadge } from './AiBadge';
 import { ProfileBar } from './ProfileBar';
-import { getResult, streamParentLetter, type ResultResponse } from '../lib/api';
+import { CareerPlan } from './CareerPlan';
+import { MentorReview } from './MentorReview';
+import { claimSession, getResult, streamParentLetter, type ResultResponse } from '../lib/api';
+import { updateUser, useAuth } from '../lib/auth';
 
 const tenge = new Intl.NumberFormat('ru-KZ');
 
 export function ResultScreen({ sessionId }: { sessionId: string }) {
+  const { token, user, refresh } = useAuth();
   const [result, setResult] = useState<ResultResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [letter, setLetter] = useState('');
   const [letterState, setLetterState] = useState<'idle' | 'streaming' | 'done'>('idle');
+  const [claiming, setClaiming] = useState(false);
+  const [claimed, setClaimed] = useState(false);
   const abort = useRef<AbortController | null>(null);
 
   useEffect(() => {
-    getResult(sessionId).then(setResult).catch((e: Error) => setError(e.message));
+    getResult(sessionId)
+      .then((r) => {
+        setResult(r);
+        setClaimed(r.claimed);
+      })
+      .catch((e: Error) => setError(e.message));
     return () => abort.current?.abort();
   }, [sessionId]);
 
@@ -34,16 +46,30 @@ export function ResultScreen({ sessionId }: { sessionId: string }) {
     }
   }, [sessionId]);
 
-  if (error) return <p className="text-rose-400">{error}</p>;
+  const claim = useCallback(async () => {
+    if (!token) return;
+    setClaiming(true);
+    setError(null);
+    try {
+      const res = await claimSession(sessionId, token);
+      updateUser(res.user);
+      setClaimed(true);
+      await refresh();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setClaiming(false);
+    }
+  }, [sessionId, token, refresh]);
+
+  if (error && !result) return <p className="text-rose-400">{error}</p>;
   if (!result) return <p className="text-zinc-500">Собираем результат…</p>;
 
   return (
     <div className="space-y-10">
       <header className="space-y-3">
         <p className="text-xs uppercase tracking-widest text-emerald-400">Результат пробы</p>
-        <h1 className="text-3xl font-semibold text-zinc-100">
-          Куда это смотрит
-        </h1>
+        <h1 className="text-3xl font-semibold text-zinc-100">Куда это смотрит</h1>
         <ProfileBar signals={result.profile} />
       </header>
 
@@ -95,6 +121,54 @@ export function ResultScreen({ sessionId }: { sessionId: string }) {
           </li>
         ))}
       </ol>
+
+      {/* Раньше результат был тупиком: человек дочитывал и закрывал вкладку.
+          Дальше — что с этим делать, и только потом всё остальное. */}
+      <CareerPlan sessionId={sessionId} profession={result.matches[0]?.profession?.title} />
+
+      <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+        <h2 className="text-lg font-medium text-zinc-100">
+          {claimed ? 'Прохождение сохранено' : 'Сохрани результат и получи очки'}
+        </h2>
+        {claimed ? (
+          <p className="mt-2 text-sm leading-relaxed text-zinc-400">
+            Оно лежит в{' '}
+            <Link href="/me" className="text-emerald-400 underline-offset-2 hover:underline">
+              твоём профиле
+            </Link>{' '}
+            — вернёшься к нему в любой момент.
+          </p>
+        ) : (
+          <>
+            <p className="mt-2 text-sm leading-relaxed text-zinc-400">
+              {result.reward.xp} XP и {result.reward.coins} очков за пройденную пробу.
+              Очков хватит на разбор от наставника — он стоит {result.reward.mentorCost}.
+            </p>
+            {token ? (
+              <button
+                onClick={claim}
+                disabled={claiming}
+                className="mt-4 rounded-xl bg-emerald-500 px-5 py-2.5 text-sm font-medium text-emerald-950 transition hover:bg-emerald-400 disabled:opacity-50"
+              >
+                {claiming ? 'Сохраняю…' : `Сохранить как ${user?.name ?? 'я'}`}
+              </button>
+            ) : (
+              <Link
+                href={`/me?claim=${sessionId}`}
+                className="mt-4 inline-block rounded-xl bg-emerald-500 px-5 py-2.5 text-sm font-medium text-emerald-950 transition hover:bg-emerald-400"
+              >
+                Завести аккаунт и сохранить
+              </Link>
+            )}
+            <p className="mt-3 text-xs leading-relaxed text-zinc-500">
+              Ни почты, ни пароля не спросим — только имя, класс и город.
+            </p>
+          </>
+        )}
+        {error && <p className="mt-3 text-sm text-rose-400">{error}</p>}
+      </section>
+
+      <MentorReview sessionId={sessionId} claimed={claimed} cost={result.reward.mentorCost} />
 
       <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">

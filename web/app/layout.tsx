@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import { TopBar } from './components/TopBar';
 
 export const metadata: Metadata = {
   title: 'CareerVerse — проба профессии, а не опросник',
@@ -12,7 +13,10 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="ru">
-      <body className="min-h-dvh bg-zinc-950 text-zinc-100 antialiased">{children}</body>
+      <body className="min-h-dvh bg-zinc-950 text-zinc-100 antialiased">
+        <TopBar />
+        {children}
+      </body>
     </html>
   );
 }

@@ -12,6 +12,8 @@ export interface TrialPayload {
   materials: string[];
   successLooksLike: string;
   profession: string;
+  step?: number;
+  totalSteps?: number;
 }
 
 export interface Task {
@@ -19,7 +21,7 @@ export interface Task {
   kind: TaskKind;
   order: number;
   prompt: string;
-  payload: TrialPayload | { rationale: string } | null;
+  payload: TrialPayload | { rationale: string; retry?: boolean } | null;
   generatedByAi: boolean;
   modelId: string;
 }
@@ -30,10 +32,26 @@ export interface Signal {
   evidence: string;
 }
 
+/**
+ * Общего числа вопросов заранее нет: разговор кончается тогда, когда модель
+ * говорит, что уже поняла человека. Поэтому здесь вилка, а не «шаг 2 из 3».
+ */
+export interface Progress {
+  stage: 'questions' | 'trial' | 'done';
+  asked: number;
+  informative?: number;
+  min: number;
+  max: number;
+  trialStep?: number;
+  trialSteps: number;
+}
+
 export interface StartResponse {
   sessionId: string;
   locale: 'RU' | 'KK';
+  grade: number | null;
   task: Task;
+  progress: Progress;
   disclaimer: string;
 }
 
@@ -42,6 +60,7 @@ export interface AnswerResponse {
   profile: Signal[];
   task: Task | null;
   finished: boolean;
+  progress: Progress;
 }
 
 export interface Match {
@@ -58,13 +77,82 @@ export interface Match {
   };
 }
 
+export interface Reward {
+  xp: number;
+  coins: number;
+  mentorCost: number;
+}
+
 export interface ResultResponse {
   sessionId: string;
+  grade: number | null;
+  claimed: boolean;
+  reward: Reward;
   profile: Signal[];
   confidence: number;
   matches: Match[];
   dialogue: { question: string; answer: string }[];
   disclaimer: string;
+}
+
+export interface AuthUser {
+  id: string;
+  name: string | null;
+  grade: number | null;
+  city: string | null;
+  xp: number;
+  coins: number;
+  level: number;
+}
+
+export interface RegisterResponse {
+  token: string;
+  loginCode: string;
+  user: AuthUser;
+  notice: string;
+}
+
+export interface HistoryEntry {
+  sessionId: string;
+  completedAt: string | null;
+  confidence: number;
+  topProfession: string | null;
+  hasMentorReview: boolean;
+}
+
+export interface MeResponse {
+  user: AuthUser;
+  history: HistoryEntry[];
+}
+
+export interface MentorReviewContent {
+  didWell: string;
+  gaps: string;
+  monthPlan: string[];
+  closing: string;
+}
+
+export interface CareerPlanContent {
+  entSubjects: string[];
+  universities: { name: string; city: string; why: string }[];
+  languages: string;
+  toGetHired: string[];
+  nextMonth: string[];
+}
+
+export interface Profession {
+  id: string;
+  title: string;
+  titleKk: string | null;
+  description: string;
+  marketData?: {
+    medianSalaryKzt: number | null;
+    vacancyCount: number | null;
+    demandTrend: string | null;
+    regions: string[] | null;
+    source: string;
+    collectedAt: string;
+  } | null;
 }
 
 async function json<T>(res: Response): Promise<T> {
@@ -75,22 +163,66 @@ async function json<T>(res: Response): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-export const startSession = (locale: 'RU' | 'KK') =>
+const headers = (token?: string) => ({
+  'content-type': 'application/json',
+  ...(token ? { authorization: `Bearer ${token}` } : {}),
+});
+
+export const startSession = (locale: 'RU' | 'KK', grade?: number) =>
   fetch(`${API}/sessions`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ consentAccepted: true, locale }),
+    headers: headers(),
+    body: JSON.stringify({ consentAccepted: true, locale, grade }),
   }).then(json<StartResponse>);
 
 export const submitAnswer = (sessionId: string, text: string) =>
   fetch(`${API}/sessions/${sessionId}/answers`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: headers(),
     body: JSON.stringify({ text }),
   }).then(json<AnswerResponse>);
 
 export const getResult = (sessionId: string) =>
   fetch(`${API}/sessions/${sessionId}/result`).then(json<ResultResponse>);
+
+export const claimSession = (sessionId: string, token: string) =>
+  fetch(`${API}/sessions/${sessionId}/claim`, {
+    method: 'POST',
+    headers: headers(token),
+  }).then(json<{ reward: Reward; user: AuthUser }>);
+
+export const requestMentorReview = (sessionId: string, token: string) =>
+  fetch(`${API}/sessions/${sessionId}/mentor-review`, {
+    method: 'POST',
+    headers: headers(token),
+  }).then(json<{ content: MentorReviewContent; costCoins: number; alreadyPaid: boolean }>);
+
+export const requestPlan = (sessionId: string, context?: string) =>
+  fetch(`${API}/sessions/${sessionId}/plan`, {
+    method: 'POST',
+    headers: headers(),
+    body: JSON.stringify({ context }),
+  }).then(json<{ content: CareerPlanContent; context: string | null; disclaimer: string }>);
+
+export const register = (body: { name: string; grade: number; city?: string }) =>
+  fetch(`${API}/auth/register`, {
+    method: 'POST',
+    headers: headers(),
+    body: JSON.stringify(body),
+  }).then(json<RegisterResponse>);
+
+export const login = (code: string) =>
+  fetch(`${API}/auth/login`, {
+    method: 'POST',
+    headers: headers(),
+    body: JSON.stringify({ code }),
+  }).then(json<{ token: string; user: AuthUser }>);
+
+export const getMe = (token: string) =>
+  fetch(`${API}/auth/me`, { headers: headers(token) }).then(json<MeResponse>);
+
+export const getProfessions = () =>
+  fetch(`${API}/professions`).then(json<Profession[]>);
 
 /**
  * Письмо родителям приходит по SSE. EventSource не используем: он не даёт
