@@ -45,8 +45,8 @@ export function CareerPlan({
       </div>
       <p className="mt-2 text-sm leading-relaxed text-zinc-400">
         {profession
-          ? `Какие предметы ЕНТ, куда поступать и что нужно, чтобы работать: ${profession.toLowerCase()}.`
-          : 'Какие предметы ЕНТ, куда поступать и что нужно для первой работы.'}
+          ? `Что сделать в ближайший месяц, какие предметы ЕНТ и куда поступать, чтобы работать: ${profession.toLowerCase()}.`
+          : 'Что сделать в ближайший месяц, какие предметы ЕНТ и куда поступать.'}
       </p>
 
       {!plan && (
@@ -82,6 +82,24 @@ export function CareerPlan({
 
       {plan && (
         <div className="mt-5 space-y-5 text-sm leading-relaxed">
+          {/* Ближайший месяц идёт первым и выделен намеренно. Всё остальное в
+              этом блоке — горизонт в годы: ЕНТ, вуз, первая работа. Подросток
+              закроет вкладку, если между «сегодня» и «профессией» не окажется
+              шага, который делается на этой неделе. */}
+          <div className="rounded-xl border border-emerald-500/25 bg-emerald-500/[0.06] p-4">
+            <h3 className="text-xs uppercase tracking-widest text-emerald-300">
+              Ближайший месяц
+            </h3>
+            <ul className="mt-2.5 space-y-2 text-zinc-200">
+              {plan.nextMonth.map((item, i) => (
+                <li key={i} className="flex gap-2.5">
+                  <span className="shrink-0 text-emerald-400/70 tabular-nums">{i + 1}</span>
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+
           <div>
             <h3 className="text-xs uppercase tracking-widest text-emerald-400">Предметы ЕНТ</h3>
             <p className="mt-1.5 text-zinc-200">{plan.entSubjects.join(' · ')}</p>
@@ -114,17 +132,6 @@ export function CareerPlan({
             </h3>
             <ul className="mt-2 space-y-1.5 text-zinc-300">
               {plan.toGetHired.map((item, i) => (
-                <li key={i}>— {item}</li>
-              ))}
-            </ul>
-          </div>
-
-          <div>
-            <h3 className="text-xs uppercase tracking-widest text-emerald-400">
-              В ближайший месяц
-            </h3>
-            <ul className="mt-2 space-y-1.5 text-zinc-300">
-              {plan.nextMonth.map((item, i) => (
                 <li key={i}>— {item}</li>
               ))}
             </ul>

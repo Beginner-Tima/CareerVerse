@@ -15,7 +15,7 @@ import {
   TrialResult,
   TrialFollowUpSchema,
   TrialFollowUpResult,
-  MatchSchema,
+  matchSchema,
   MatchResult,
   MentorReviewSchema,
   MentorReviewResult,
@@ -36,6 +36,18 @@ const DEFAULT_MODEL = 'claude-haiku-4-5';
  * ЕНТ на казахском, и демо на ломаном языке — худшее, что можно показать жюри.
  */
 const DEFAULT_MODEL_KK = 'claude-sonnet-5';
+
+/**
+ * Модели, которые ещё принимают `temperature`.
+ *
+ * У Sonnet 5 и всего поколения Opus 4.7+ параметры сэмплирования из API убраны:
+ * ненулевая `temperature` возвращает 400. Казахская ветка идёт на Sonnet 5,
+ * поэтому детерминированный подбор включается только там, где параметр
+ * поддерживается. На казахском разброс вариантов остаётся — это хуже, чем
+ * повторяемый результат, и несравнимо лучше, чем пятисотка в тот самый момент,
+ * когда на экране должны появиться профессии.
+ */
+const SAMPLING_SUPPORTED = new Set(['claude-haiku-4-5']);
 
 // $ за миллион токенов, [вход, выход]. У Sonnet 5 сейчас вводная цена $2/$10,
 // она действует до 31.08.2026 — после этого станет $3/$15.
@@ -154,7 +166,19 @@ export class ClaudeService {
     );
   }
 
-  /** Сопоставление накопленного профиля с каталогом профессий. */
+  /**
+   * Сопоставление накопленного профиля с каталогом профессий.
+   *
+   * Единственный вызов с `temperature: 0`. Два одинаковых прогона давали разный
+   * первый вариант (Backend 0.89 / Агроинженер 0.89): для вопроса «что тебе
+   * подходит» разброс — это не творчество, а несерьёзность, и на защите он
+   * означает, что показанный результат нельзя повторить. Остальные промпты
+   * пишут текст человеку, там разнообразие уместно.
+   *
+   * Фактически срабатывает на русском: на казахском модель — Sonnet 5, а он
+   * `temperature` больше не принимает (см. SAMPLING_SUPPORTED). Демо на
+   * казахском по-прежнему стоит прогнать заранее.
+   */
   async matchProfessions(
     learner: Learner,
     params: {
@@ -164,12 +188,13 @@ export class ClaudeService {
     },
   ): Promise<MatchResult> {
     return this.parse(
-      MatchSchema,
+      matchSchema(params.catalog.map((p) => p.id)),
       prompts.SYSTEM_MATCH(learner),
       prompts.userMatch(params),
       MAX_TOKENS.match,
       'match',
       learner.locale,
+      0,
     );
   }
 
@@ -240,6 +265,7 @@ export class ClaudeService {
       professionTitle: string;
       professionDescription: string;
       signals: Signal[];
+      today: string;
       context?: string | null;
     },
   ): Promise<NextStepsResult> {
@@ -298,14 +324,22 @@ export class ClaudeService {
     maxTokens: number,
     label: string,
     locale?: Locale,
+    temperature?: number,
   ): Promise<T> {
     const model = this.modelFor(locale ?? Locale.RU);
+    // Просьба о повторяемости выполняется там, где модель это умеет, и молча
+    // игнорируется там, где параметра больше нет, — см. SAMPLING_SUPPORTED.
+    const sampling =
+      temperature !== undefined && SAMPLING_SUPPORTED.has(model)
+        ? { temperature }
+        : {};
 
     try {
       const message = await this.client.messages.parse({
         model,
         max_tokens: maxTokens,
         system,
+        ...sampling,
         // Sonnet 5 думает по умолчанию, а max_tokens покрывает размышления
         // вместе с ответом — с включённым мышлением JSON обрывался на середине.
         // Здесь нужен структурированный вывод, а не рассуждения вслух.
@@ -338,6 +372,16 @@ export class ClaudeService {
         this.logger.error(`Claude API ${error.status} на ${label}: ${error.message}`);
         throw new ServiceUnavailableException(
           'Сервис ИИ временно недоступен, попробуй ещё раз через минуту.',
+        );
+      }
+      // Схему SDK проверяет на клиенте — в том числе перечисление id профессий,
+      // которое в API не уходит (см. matchSchema). Несошедшийся ответ должен
+      // выглядеть как «модель ответила не по схеме», а не как пятисотка без
+      // объяснений: у вызывающего кода на этот случай есть понятный текст.
+      if (error instanceof Error && error.name.includes('Zod')) {
+        this.logger.error(`Ответ не прошёл схему на ${label}: ${error.message}`);
+        throw new ServiceUnavailableException(
+          `Модель вернула ответ не по схеме (${label}). Попробуй ещё раз.`,
         );
       }
       throw error;

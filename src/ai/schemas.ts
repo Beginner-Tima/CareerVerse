@@ -62,20 +62,44 @@ export const ClarifyingQuestionSchema = z.object({
 });
 export type ClarifyingQuestionResult = z.infer<typeof ClarifyingQuestionSchema>;
 
-export const MatchSchema = z.object({
-  matches: z
-    .array(
-      z.object({
-        professionId: z.string().describe('id профессии строго из переданного каталога'),
-        fit: z.number().describe('Насколько подходит, от 0 до 1'),
-        because: z
-          .string()
-          .describe('Одно предложение подростку: почему именно это, со ссылкой на его ответы'),
-      }),
-    )
-    .describe('Три профессии, от самой подходящей к менее'),
-});
-export type MatchResult = z.infer<typeof MatchSchema>;
+/**
+ * Схема подбора собирается под конкретный каталог: `professionId` — перечисление
+ * реальных id, а не просто строка.
+ *
+ * Пока профессий было шесть, хватало просьбы в описании поля. На сотне
+ * вариантов просьба перестаёт быть гарантией: достаточно перепутать букву в id,
+ * чтобы фильтр в sessions.service отбросил вариант, а при невезении — все три,
+ * и подросток увидит «не удалось подобрать профессию» ровно в тот момент, ради
+ * которого проходил тест.
+ *
+ * Но гарантии здесь всё равно нет, и важно понимать почему. SDK не отправляет
+ * `enum` в API: при сборке JSON Schema поле становится обычной строкой, а
+ * список допустимых значений дописывается в её описание (проверено на выводе
+ * `zodOutputFormat`). То есть перечисление работает как подсказка модели прямо
+ * у поля — заметно сильнее общей фразы «бери из каталога», — а сходимость
+ * проверяется уже после ответа, на клиенте. Настоящий предохранитель по-прежнему
+ * один: фильтр по каталогу в sessions.service.
+ */
+export const matchSchema = (professionIds: readonly string[]) =>
+  z.object({
+    matches: z
+      .array(
+        z.object({
+          professionId:
+            professionIds.length > 0
+              ? z
+                  .enum(professionIds as [string, ...string[]])
+                  .describe('id профессии строго из переданного каталога')
+              : z.string().describe('id профессии строго из переданного каталога'),
+          fit: z.number().describe('Насколько подходит, от 0 до 1'),
+          because: z
+            .string()
+            .describe('Одно предложение подростку: почему именно это, со ссылкой на его ответы'),
+        }),
+      )
+      .describe('Три профессии, от самой подходящей к менее'),
+  });
+export type MatchResult = z.infer<ReturnType<typeof matchSchema>>;
 
 export const TrialSchema = z.object({
   title: z.string().describe('Название пробы, 3-6 слов'),
@@ -143,6 +167,11 @@ export const NextStepsSchema = z.object({
     .describe('Что реально спрашивают на входе в профессию в РК: навыки, портфолио, практика'),
   nextMonth: z
     .array(z.string())
-    .describe('2-3 шага, которые можно сделать в ближайший месяц, ничего не покупая'),
+    .describe(
+      '3-4 шага на ближайшие 30 дней, каждый — законченное действие, которое ' +
+        'можно сделать бесплатно и не выходя из своего города: что открыть, ' +
+        'куда написать, кого спросить, что собрать. Не «изучи основы», а ' +
+        '«пройди бесплатный курс X на Y и выложи получившееся»',
+    ),
 });
 export type NextStepsResult = z.infer<typeof NextStepsSchema>;

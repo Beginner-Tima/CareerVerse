@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AiBadge } from '../components/AiBadge';
 import { ProfileBar } from '../components/ProfileBar';
 import {
@@ -12,6 +12,7 @@ import {
   type Task,
   type TrialPayload,
 } from '../lib/api';
+import { rememberExpectation } from '../lib/expectation';
 
 interface Exchange {
   question: string;
@@ -20,6 +21,17 @@ interface Exchange {
 }
 
 const GRADES = [7, 8, 9, 10, 11];
+
+/**
+ * Один ответ — это два вызова модели подряд, 8–15 секунд. Раньше всё это время
+ * на кнопке висело «Читаю ответ…», и пауза читалась как зависание. Подписи
+ * переключаются по тем же двум шагам, которые реально идут на сервере: сначала
+ * разбор ответа, потом следующий вопрос. Ничего не имитируем — просто называем
+ * вслух то, что и так происходит.
+ */
+const THINKING = ['Читаю ответ…', 'Ищу, что за этим стоит…', 'Придумываю следующий вопрос…'];
+const THINKING_TRIAL = ['Читаю решение…', 'Смотрю, к чему оно привело…', 'Меняю ситуацию…'];
+const THINKING_STEP_MS = 4000;
 
 export default function TestPage() {
   const router = useRouter();
@@ -31,8 +43,23 @@ export default function TestPage() {
   const [history, setHistory] = useState<Exchange[]>([]);
   const [profile, setProfile] = useState<Signal[]>([]);
   const [draft, setDraft] = useState('');
+  const [expectation, setExpectation] = useState('');
   const [busy, setBusy] = useState(false);
+  const [thinkingStep, setThinkingStep] = useState(0);
   const [error, setError] = useState<string | null>(null);
+
+  // Подписи идут вперёд, пока ждём сервер, и замирают на последней: досрочно
+  // объявлять «готово» нельзя, а бесконечно крутить по кругу — врать про прогресс.
+  // Счётчик сбрасывает тот, кто начинает ожидание, а не эффект: setState прямо в
+  // теле эффекта тянет за собой лишний каскад рендеров.
+  useEffect(() => {
+    if (!busy) return;
+    const id = setInterval(
+      () => setThinkingStep((s) => Math.min(s + 1, THINKING.length - 1)),
+      THINKING_STEP_MS,
+    );
+    return () => clearInterval(id);
+  }, [busy]);
 
   async function begin(locale: 'RU' | 'KK') {
     if (!grade) {
@@ -43,6 +70,9 @@ export default function TestPage() {
     setError(null);
     try {
       const session = await startSession(locale, grade);
+      // Ожидание кладём рядом с сессией в браузере и никуда не отправляем:
+      // в промпте подбора оно превратилось бы в подсказку. См. lib/expectation.
+      rememberExpectation(session.sessionId, expectation);
       setSessionId(session.sessionId);
       setTask(session.task);
       setProgress(session.progress);
@@ -56,6 +86,7 @@ export default function TestPage() {
 
   async function send() {
     if (!task || draft.trim().length === 0) return;
+    setThinkingStep(0);
     setBusy(true);
     setError(null);
     const answered = task;
@@ -114,6 +145,24 @@ export default function TestPage() {
               </button>
             ))}
           </div>
+        </section>
+
+        {/* Спрашиваем до первого вопроса и не показываем модели: в конце будет
+            видно, куда человек шёл сам и куда его привели собственные ответы. */}
+        <section className="space-y-3 rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+          <h2 className="text-sm font-medium text-zinc-200">
+            Кем ты сейчас думаешь стать?
+          </h2>
+          <p className="text-sm leading-relaxed text-zinc-400">
+            Одним словом, как есть — даже если пока не уверен. Это не ответ на тест
+            и модели не передаётся: мы сравним с результатом в конце.
+          </p>
+          <input
+            value={expectation}
+            onChange={(e) => setExpectation(e.target.value)}
+            placeholder="Например: юрист. Или «не знаю» — тоже честно."
+            className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-[15px] text-zinc-100 outline-none transition placeholder:text-zinc-600 focus:border-emerald-500/50"
+          />
         </section>
 
         <section className="space-y-3 rounded-2xl border border-white/10 bg-white/[0.03] p-5">
@@ -234,7 +283,7 @@ export default function TestPage() {
             disabled={busy || draft.trim().length === 0}
             className="rounded-xl bg-emerald-500 px-6 py-3 font-medium text-emerald-950 transition hover:bg-emerald-400 disabled:opacity-40"
           >
-            {busy ? 'Читаю ответ…' : 'Ответить'}
+            {busy ? (trial ? THINKING_TRIAL : THINKING)[thinkingStep] : 'Ответить'}
           </button>
         </section>
       )}

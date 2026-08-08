@@ -1,3 +1,4 @@
+import { WIDE_CATALOG } from './catalog';
 import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 
@@ -14,9 +15,13 @@ const prisma = new PrismaClient({
 // 13-й символ = '4' (версия), 17-й = '8' (вариант). Иначе @IsUUID() в
 // CompleteLevelDto отвергает их и POST /api/progress/complete падает с 400.
 //
-// Каталог намеренно узкий: шесть проработанных профессий вместо полусотни
-// поверхностных. Уровни здесь — шаблоны тем, а не готовые задания: сами задания
-// генерируются под конкретного подростка и живут в TaskInstance.
+// Требование к формату id касается только уровней: их идентификаторы уходят в
+// CompleteLevelDto. У профессий из широкого каталога id короткие и читаемые —
+// см. prisma/catalog.ts, там объяснено, почему это важно для модели.
+//
+// Уровни — шаблоны тем, а не готовые задания: сами задания генерируются под
+// конкретного подростка и живут в TaskInstance. У широкого каталога их нет:
+// адаптивный тест уровни не использует.
 //
 // Данные рынка труда — локальная выгрузка, а не живой запрос к enbek.kz:
 // дёргать чужой API со сцены — верный способ показать жюри экран ошибки.
@@ -31,16 +36,28 @@ interface SeedProfession {
   titleKk: string;
   description: string;
   order: number;
-  market: {
-    medianSalaryKzt: number;
-    vacancyCount: number;
-    demandTrend: string;
-    regions: string[];
+  /**
+   * Необязательно — и это принципиально. Цифры рынка проставлены только там,
+   * где они действительно выгружены; выдумывать медианную зарплату под
+   * подписью «enbek.kz» нельзя, а сузить каталог до шести профессий ради
+   * красивой карточки — значит отвечать подростку из шести вариантов, как бы
+   * глубоко он ни раскрылся. Экран результата умеет и без блока рынка.
+   */
+  market?: {
+    medianSalaryKzt?: number;
+    vacancyCount?: number;
+    demandTrend?: string;
+    regions?: string[];
+    /** У широкого каталога подпись своя — медиана области, а не профессии. */
+    source?: string;
+    collectedAt?: Date;
   };
-  levels: { id: string; title: string; topic: string; order: number; rewardXp: number; rewardCoins: number }[];
+  /** Старая механика уровней. Адаптивный тест их не использует. */
+  levels?: { id: string; title: string; topic: string; order: number; rewardXp: number; rewardCoins: number }[];
 }
 
-const professions: SeedProfession[] = [
+/** Шесть профессий с настоящей выгрузкой рынка труда и старыми уровнями. */
+const curated: SeedProfession[] = [
   {
     id: '11111111-1111-4111-8111-111111111111',
     title: 'Backend-разработчик',
@@ -149,6 +166,16 @@ const professions: SeedProfession[] = [
       { id: '66666666-6666-4666-8666-000000000002', title: 'Дешевле или быстрее', topic: 'выбор компромисса', order: 2, rewardXp: 200, rewardCoins: 100 },
     ],
   },
+
+];
+
+/**
+ * Полный справочник = шесть проработанных профессий плюс широкий каталог.
+ * Порядок с сотни, чтобы проработанные шли первыми в списке на сайте.
+ */
+const professions: SeedProfession[] = [
+  ...curated,
+  ...WIDE_CATALOG.map((entry, i) => ({ ...entry, order: 100 + i })),
 ];
 
 async function main() {
@@ -172,18 +199,24 @@ async function main() {
       },
     });
 
-    await prisma.laborMarketData.upsert({
-      where: { professionId: createdProf.id },
-      update: { ...prof.market, source: MARKET_SOURCE, collectedAt: COLLECTED_AT },
-      create: {
-        professionId: createdProf.id,
-        ...prof.market,
-        source: MARKET_SOURCE,
-        collectedAt: COLLECTED_AT,
-      },
-    });
+    if (prof.market) {
+      await prisma.laborMarketData.upsert({
+        where: { professionId: createdProf.id },
+        update: {
+          ...prof.market,
+          source: prof.market.source ?? MARKET_SOURCE,
+          collectedAt: prof.market.collectedAt ?? COLLECTED_AT,
+        },
+        create: {
+          professionId: createdProf.id,
+          ...prof.market,
+          source: prof.market.source ?? MARKET_SOURCE,
+          collectedAt: prof.market.collectedAt ?? COLLECTED_AT,
+        },
+      });
+    }
 
-    for (const lvl of prof.levels) {
+    for (const lvl of prof.levels ?? []) {
       await prisma.level.upsert({
         where: { id: lvl.id },
         update: {
@@ -207,12 +240,15 @@ async function main() {
       });
     }
 
-    console.log(`✅ "${createdProf.title}" — ${prof.levels.length} уровня, данные рынка труда`);
+    console.log(
+      `✅ "${createdProf.title}" — уровней: ${prof.levels?.length ?? 0}, ` +
+        `рынок труда: ${prof.market ? 'есть' : 'нет'}`,
+    );
   }
 
   // Каталог менялся: уровни прошлой версии сида остались бы висеть под новыми
   // профессиями. Сид — источник истины для справочника, поэтому лишнее убираем.
-  const seededLevelIds = professions.flatMap((p) => p.levels.map((l) => l.id));
+  const seededLevelIds = professions.flatMap((p) => (p.levels ?? []).map((l) => l.id));
   const stale = await prisma.level.findMany({
     where: { id: { notIn: seededLevelIds } },
     select: { id: true, title: true },

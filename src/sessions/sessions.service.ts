@@ -51,6 +51,12 @@ const OPENERS: Record<Locale, string> = {
 
 const STATIC_OPENER_MODEL = 'static/opener';
 
+/** «август 2026» — для плана на ближайший месяц модели нужен школьный календарь. */
+const CURRENT_MONTH = new Intl.DateTimeFormat('ru-RU', {
+  month: 'long',
+  year: 'numeric',
+});
+
 interface StoredMatch {
   professionId: string;
   fit: number;
@@ -259,7 +265,11 @@ export class SessionsService {
           },
         };
       }),
-      dialogue: this.dialogueOf(session.tasks),
+      // Расшифровки разговора здесь нет и не будет. Роут открыт по `@Public()`,
+      // потому что жюри и родитель открывают результат по ссылке без логина, —
+      // а дословные ответы подростка за «защитой незнанием адреса» держать
+      // нельзя. Экран результата их всё равно не рисовал: наружу уходят только
+      // выводы (профиль, профессии, рынок), сам текст остаётся в базе.
       disclaimer: this.disclaimer(session.locale),
     };
   }
@@ -477,6 +487,10 @@ export class SessionsService {
       professionTitle: this.titleOf(profession, session.locale),
       professionDescription: profession.description,
       signals: this.signalsOf(session.interestProfile?.traits),
+      // Без этого модель не знает, какой сейчас месяц, и советует «записаться в
+      // кружок» в июне так же уверенно, как в сентябре. Школьный год — главный
+      // календарь подростка, и план на месяц без него получается вневременным.
+      today: CURRENT_MONTH.format(new Date()),
       context,
     });
 

@@ -101,7 +101,6 @@ export interface ResultResponse {
   profile: Signal[];
   confidence: number;
   matches: Match[];
-  dialogue: { question: string; answer: string }[];
   disclaimer: string;
 }
 
@@ -163,6 +162,19 @@ export interface Profession {
     source: string;
     collectedAt: string;
   } | null;
+}
+
+/**
+ * Оборванный запрос каждый браузер называет по-своему: Safari — «Load failed»,
+ * Chrome — «Failed to fetch». Подростку это не говорит ничего, а на телефоне в
+ * дороге или на конференц-вайфае случается регулярно. Сообщения сервера
+ * пропускаем как есть — они написаны для человека.
+ */
+export function humanError(e: unknown): string {
+  const message = e instanceof Error ? e.message : String(e);
+  return /load failed|failed to fetch|networkerror|network request failed/i.test(message)
+    ? 'Не получилось связаться с сервером. Проверь интернет и попробуй ещё раз.'
+    : message;
 }
 
 async function json<T>(res: Response): Promise<T> {
