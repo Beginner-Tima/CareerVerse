@@ -39,3 +39,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# служебные файлы, которые next dev создаёт заново
+AGENTS.md
+CLAUDE.md
