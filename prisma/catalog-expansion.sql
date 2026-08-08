@@ -1,10 +1,7 @@
-
-> backend@0.0.1 catalog:sql
-> ts-node scripts/catalog-sql.ts
-
 -- Широкий каталог профессий: 96 записей.
 -- ФАЙЛ СГЕНЕРИРОВАН — правьте prisma/catalog.ts и перезапускайте:
---   npm run catalog:sql > prisma/catalog-expansion.sql
+--   npm run --silent catalog:sql > prisma/catalog-expansion.sql
+-- Без --silent шапка npm попадёт в начало файла и psql упадёт на первой строке.
 --
 -- Применение на проде:
 --   supabase link --project-ref ypgsswfqrpipawauxsbd

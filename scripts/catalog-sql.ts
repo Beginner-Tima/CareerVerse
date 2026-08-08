@@ -9,8 +9,13 @@
  * Генерируем, а не храним SQL руками: описания считаются из prisma/catalog.ts,
  * поэтому база и код не могут разъехаться.
  *
- *   npm run catalog:sql > prisma/catalog-expansion.sql
+ *   npm run --silent catalog:sql > prisma/catalog-expansion.sql
  *   supabase db query --linked -f prisma/catalog-expansion.sql
+ *
+ * `--silent` обязателен. Без него npm печатает в stdout свою шапку («> backend
+ * catalog:sql»), она попадает в начало файла, и psql падает на первой же
+ * строке синтаксической ошибкой — а следом валится и вставка рынка труда, у
+ * которой не оказывается профессий во внешнем ключе.
  */
 import { WIDE_CATALOG } from '../prisma/catalog';
 
@@ -42,7 +47,8 @@ const marketRows = withMarket
 
 process.stdout.write(`-- Широкий каталог профессий: ${WIDE_CATALOG.length} записей.
 -- ФАЙЛ СГЕНЕРИРОВАН — правьте prisma/catalog.ts и перезапускайте:
---   npm run catalog:sql > prisma/catalog-expansion.sql
+--   npm run --silent catalog:sql > prisma/catalog-expansion.sql
+-- Без --silent шапка npm попадёт в начало файла и psql упадёт на первой строке.
 --
 -- Применение на проде:
 --   supabase link --project-ref ypgsswfqrpipawauxsbd
