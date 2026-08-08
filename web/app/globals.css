@@ -1,0 +1,25 @@
+@import "tailwindcss";
+
+/*
+ * Тема намеренно одна — тёмная, а не «по системным настройкам».
+ * Причина не в эстетике: правило `body { background: ... }` из этого файла
+ * лежит вне слоёв Tailwind и побеждает любую утилиту вроде `bg-zinc-950`,
+ * какая бы у той ни была специфичность. Пока здесь стоял светлый фон по
+ * умолчанию, демо на телефоне со светлой темой открывалось белым фоном
+ * со светлым текстом — половина экрана была нечитаема.
+ */
+:root {
+  --background: #09090b; /* zinc-950 */
+  --foreground: #f4f4f5; /* zinc-100 */
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
