@@ -4,6 +4,7 @@
   "installCommand": "npm install",
   "framework": null,
   "outputDirectory": "public",
+  "regions": ["fra1"],
   "functions": {
     "api/index.js": {
       "includeFiles": "dist/**",

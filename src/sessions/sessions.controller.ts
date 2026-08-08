@@ -68,6 +68,14 @@ export class SessionsController {
     return new Observable<MessageEvent>((subscriber) => {
       let cancelled = false;
 
+      // Пока модель думает над первым словом, поток молчит секунд десять.
+      // Мобильный оператор или конференционный Wi-Fi успевают счесть такое
+      // соединение мёртвым и закрыть его. Пульс это предотвращает; фронт
+      // игнорирует пакеты без text и done, поэтому менять его не нужно.
+      const heartbeat = setInterval(() => {
+        if (!cancelled) subscriber.next({ data: { ping: true } } as MessageEvent);
+      }, 5000);
+
       void (async () => {
         try {
           for await (const chunk of stream) {
@@ -84,6 +92,7 @@ export class SessionsController {
       // Читатель закрыл вкладку — не дописываем письмо в пустоту.
       return () => {
         cancelled = true;
+        clearInterval(heartbeat);
         void stream.return(undefined);
       };
     });
