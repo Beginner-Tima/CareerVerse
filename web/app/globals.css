@@ -1,27 +1,105 @@
 @import "tailwindcss";
 
 /*
- * Тема намеренно одна — тёмная, а не «по системным настройкам».
- * Причина не в эстетике: правило `body { background: ... }` из этого файла
- * лежит вне слоёв Tailwind и побеждает любую утилиту вроде `bg-zinc-950`,
- * какая бы у той ни была специфичность. Пока здесь стоял светлый фон по
- * умолчанию, демо на телефоне со светлой темой открывалось белым фоном
- * со светлым текстом — половина экрана была нечитаема.
+ * Светлая тема из дизайн-гайда. Одна, а не «по системным настройкам»: правило
+ * `body { background: ... }` из этого файла лежит вне слоёв Tailwind и побеждает
+ * любую утилиту, поэтому вторая тема здесь означала бы драку правил, а не выбор.
+ *
+ * Токены названы так же, как в гайде, чтобы код читался рядом с ним. Исключения
+ * два, и оба сознательные:
+ *
+ * `neutral-200` в гайде нет, но состояния наведения без него не собрать: между
+ * 100 и 300 слишком большой шаг, кнопка под курсором либо не менялась, либо
+ * темнела рывком.
+ *
+ * `danger` в гайде тоже нет — там один акцент и точка. Но правило «один акцент»
+ * про украшение, а не про смысл: сообщение об ошибке, покрашенное в тот же
+ * синий, что и кнопка «Ответить», читается как обычная подпись. Красный здесь
+ * несёт смысл, а не настроение, и больше нигде не появляется.
  */
 :root {
-  --background: #09090b; /* zinc-950 */
-  --foreground: #f4f4f5; /* zinc-100 */
+  --cv-page: #f3f2f2;
+  --cv-surface: #eae9e9;
+  --cv-ink: #201e1d;
+  --cv-divider: rgb(32 30 29 / 40%);
+  --cv-danger: #c2321a;
+
+  --cv-accent: #1f4bff;
+  --cv-accent-100: #eff3ff;
+  --cv-accent-200: #dbe4ff;
+  --cv-accent-300: #b8c9ff;
+  --cv-accent-400: #8aa6ff;
+  --cv-accent-500: #4d72ff;
+  --cv-accent-600: #1739d6;
+  --cv-accent-700: #102ba3;
+  --cv-accent-800: #0c1f75;
+  --cv-accent-900: #0a1a4d;
+
+  --cv-neutral-100: #f8f4f4;
+  --cv-neutral-200: #e5e1e1;
+  --cv-neutral-300: #d7d3d3;
+  --cv-neutral-400: #bab6b6;
+  --cv-neutral-500: #9b9797;
+  --cv-neutral-600: #7d7979;
+  --cv-neutral-700: #605d5d;
+  --cv-neutral-800: #444141;
+  --cv-neutral-900: #2d2b2b;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-page: var(--cv-page);
+  --color-surface: var(--cv-surface);
+  --color-ink: var(--cv-ink);
+  --color-divider: var(--cv-divider);
+  --color-danger: var(--cv-danger);
+
+  --color-accent: var(--cv-accent);
+  --color-accent-100: var(--cv-accent-100);
+  --color-accent-200: var(--cv-accent-200);
+  --color-accent-300: var(--cv-accent-300);
+  --color-accent-400: var(--cv-accent-400);
+  --color-accent-500: var(--cv-accent-500);
+  --color-accent-600: var(--cv-accent-600);
+  --color-accent-700: var(--cv-accent-700);
+  --color-accent-800: var(--cv-accent-800);
+  --color-accent-900: var(--cv-accent-900);
+
+  /* Перекрывают серые Tailwind целиком — чтобы `neutral-600` в коде означал
+     тёплый серый из гайда, а не холодный из коробки. */
+  --color-neutral-100: var(--cv-neutral-100);
+  --color-neutral-200: var(--cv-neutral-200);
+  --color-neutral-300: var(--cv-neutral-300);
+  --color-neutral-400: var(--cv-neutral-400);
+  --color-neutral-500: var(--cv-neutral-500);
+  --color-neutral-600: var(--cv-neutral-600);
+  --color-neutral-700: var(--cv-neutral-700);
+  --color-neutral-800: var(--cv-neutral-800);
+  --color-neutral-900: var(--cv-neutral-900);
+
+  /*
+   * В гайде стоит Archivo, но у него нет кириллицы — только latin, latin-ext и
+   * vietnamese. Весь интерфейс здесь русский и казахский, так что Archivo не
+   * применился бы ни к одной букве: всё уехало бы в system-ui, и выбор шрифта
+   * оказался бы бутафорией. Golos Text — гротеск с той же плотностью на тяжёлых
+   * весах, но кириллица у него не адаптированная, а родная, включая казахские
+   * Ә, Ғ, Қ, Ң, Ө, Ұ, Ү, Һ, І.
+   */
+  --font-heading: var(--font-golos), system-ui, sans-serif;
+  --font-body: var(--font-golos), system-ui, sans-serif;
+
+  --radius-sm: 10px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+
+  --shadow-sm: 0 1px 2px rgb(45 43 43 / 14%);
+  --shadow-md: 0 3px 10px rgb(45 43 43 / 16%);
+  --shadow-lg: 0 12px 32px rgb(45 43 43 / 22%);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  background: var(--cv-page);
+  color: var(--cv-ink);
+  font-family: var(--font-golos), system-ui, sans-serif;
 }
 
 /*
@@ -72,6 +150,22 @@ body {
   animation: float-away 1800ms ease-out both;
 }
 
+/* Ожидание модели: три точки под номером вопроса, вразнобой. */
+@keyframes dots {
+  0%,
+  80%,
+  100% {
+    opacity: 0.2;
+  }
+  40% {
+    opacity: 1;
+  }
+}
+
+.dot {
+  animation: dots 1.4s ease-in-out infinite;
+}
+
 /*
  * Кому движение мешает — тому его нет. Это не вежливость: у части подростков
  * вестибулярные расстройства, и анимация на весь экран для них не украшение.
@@ -79,7 +173,8 @@ body {
  */
 @media (prefers-reduced-motion: reduce) {
   .enter-up,
-  .float-away {
+  .float-away,
+  .dot {
     animation: none;
   }
 }

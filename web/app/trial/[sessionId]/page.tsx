@@ -68,29 +68,29 @@ export default function TrialPage() {
   return (
     <main className="mx-auto max-w-2xl space-y-6 px-5 py-12">
       {progress && (
-        <p className="text-xs uppercase tracking-widest text-zinc-500">
+        <p className="text-xs uppercase tracking-widest text-neutral-600">
           Рабочая проба · шаг {progress.trialStep ?? 1} из {progress.trialSteps}
         </p>
       )}
 
       {!task && !error && (
-        <p className="text-zinc-500">Собираю пробу под твой результат…</p>
+        <p className="text-neutral-600">Собираю пробу под твой результат…</p>
       )}
-      {error && <p className="text-sm text-rose-400">{error}</p>}
+      {error && <p className="text-sm text-danger">{error}</p>}
 
       {trial && task && (
         <>
-          <section className="space-y-3 rounded-2xl border border-emerald-500/20 bg-emerald-500/[0.04] p-5">
+          <section className="space-y-3 rounded-2xl border border-accent-200 bg-accent-100 p-5">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-xs uppercase tracking-widest text-emerald-400">
+              <p className="text-xs uppercase tracking-widest text-accent-700">
                 {trial.step === 2 ? 'Что вышло из твоего решения' : 'Ситуация'} ·{' '}
                 {trial.profession}
               </p>
               <AiBadge model={task.modelId} />
             </div>
-            <h1 className="text-lg font-medium text-zinc-100">{trial.title}</h1>
-            <p className="text-[15px] leading-relaxed text-zinc-300">{trial.scenario}</p>
-            <ul className="space-y-1.5 border-t border-emerald-500/15 pt-3 text-sm text-zinc-400">
+            <h1 className="text-lg font-medium text-ink">{trial.title}</h1>
+            <p className="text-[15px] leading-relaxed text-neutral-800">{trial.scenario}</p>
+            <ul className="space-y-1.5 border-t border-accent-200 pt-3 text-sm text-neutral-700">
               {trial.materials.map((m, i) => (
                 <li key={i} className="leading-relaxed">
                   — {m}
@@ -99,7 +99,7 @@ export default function TrialPage() {
             </ul>
           </section>
 
-          <p className="text-[17px] leading-relaxed text-zinc-100">{task.prompt}</p>
+          <p className="text-[17px] leading-relaxed text-ink">{task.prompt}</p>
 
           <textarea
             value={draft}
@@ -107,13 +107,13 @@ export default function TrialPage() {
             disabled={busy}
             rows={6}
             placeholder="Своими словами. Всё, что нужно для решения, есть выше."
-            className="w-full resize-none rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-[15px] leading-relaxed text-zinc-100 outline-none transition placeholder:text-zinc-600 focus:border-emerald-500/50 disabled:opacity-50"
+            className="w-full resize-none rounded-2xl border border-divider bg-surface p-4 text-[15px] leading-relaxed text-ink outline-none transition placeholder:text-neutral-500 focus:border-accent disabled:opacity-50"
           />
 
           <button
             onClick={send}
             disabled={busy || draft.trim().length === 0}
-            className="rounded-xl bg-emerald-500 px-6 py-3 font-medium text-emerald-950 transition hover:bg-emerald-400 disabled:opacity-40"
+            className="rounded-xl bg-accent px-6 py-3 font-medium text-page transition hover:bg-accent-600 disabled:opacity-40"
           >
             {busy ? 'Смотрю, что вышло…' : 'Ответить'}
           </button>

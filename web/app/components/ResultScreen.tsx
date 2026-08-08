@@ -29,26 +29,26 @@ const tenge = new Intl.NumberFormat('ru-KZ');
 const VERDICT_TONE = {
   unsure: {
     heading: 'Было «не знаю»',
-    box: 'border-white/15 bg-white/[0.04]',
-    title: 'text-zinc-100',
+    box: 'border-divider bg-surface',
+    title: 'text-ink',
     note: 'Разговор и не спрашивал про профессии — он спрашивал про то, что тебе интересно. Название собралось из твоих ответов.',
   },
   confirmed: {
     heading: 'Совпало',
-    box: 'border-emerald-500/30 bg-emerald-500/[0.06]',
-    title: 'text-emerald-300',
+    box: 'border-accent-300 bg-accent-100',
+    title: 'text-accent-700',
     note: 'Это не эхо твоего же ответа: названная профессия модели не передавалась. Она пришла к ней сама — по тому, что было в разговоре.',
   },
   shifted: {
     heading: 'Почти совпало',
-    box: 'border-amber-400/30 bg-amber-400/[0.06]',
-    title: 'text-amber-200',
+    box: 'border-neutral-400 bg-neutral-100',
+    title: 'text-ink',
     note: 'Названное в начале модели не передавалось: она опиралась только на разговор. Почему первым оказалось другое — ниже, первым пунктом.',
   },
   diverged: {
     heading: 'Ожидание и результат разошлись',
-    box: 'border-amber-400/30 bg-amber-400/[0.06]',
-    title: 'text-amber-200',
+    box: 'border-neutral-400 bg-neutral-100',
+    title: 'text-ink',
     note: 'Названное в начале модели не передавалось: она опиралась только на разговор и про твой первый ответ ничего не знала. Почему получилось именно так — ниже, первым пунктом.',
   },
 } as const;
@@ -149,14 +149,14 @@ export function ResultScreen({ sessionId }: { sessionId: string }) {
   if (error && !result) {
     return (
       <div className="space-y-4">
-        <p className="text-rose-400">{error}</p>
-        <p className="text-sm leading-relaxed text-zinc-400">
+        <p className="text-danger">{error}</p>
+        <p className="text-sm leading-relaxed text-neutral-700">
           Результат никуда не пропал — он сохранён за этой ссылкой.
         </p>
         <button
           onClick={retry}
           disabled={loading}
-          className="rounded-xl bg-emerald-500 px-5 py-2.5 text-sm font-medium text-emerald-950 transition hover:bg-emerald-400 disabled:opacity-50"
+          className="rounded-xl bg-accent px-5 py-2.5 text-sm font-medium text-page transition hover:bg-accent-600 disabled:opacity-50"
         >
           {loading ? 'Пробую…' : 'Попробовать ещё раз'}
         </button>
@@ -170,26 +170,26 @@ export function ResultScreen({ sessionId }: { sessionId: string }) {
     return (
       <div className="space-y-10" aria-busy="true">
         <header className="space-y-3">
-          <p className="text-xs uppercase tracking-widest text-emerald-400">
+          <p className="text-xs uppercase tracking-widest text-accent-700">
             {t('result.kicker')}
           </p>
-          <div className="h-8 w-56 animate-pulse rounded-lg bg-white/5" />
+          <div className="h-8 w-56 animate-pulse rounded-lg bg-neutral-300" />
         </header>
 
         <ol className="space-y-4">
           {[0, 1, 2].map((i) => (
             <li
               key={i}
-              className="space-y-3 rounded-2xl border border-white/10 bg-white/[0.03] p-5"
+              className="space-y-3 rounded-2xl border border-divider bg-surface p-5"
             >
-              <div className="h-5 w-1/2 animate-pulse rounded bg-white/5" />
-              <div className="h-4 w-full animate-pulse rounded bg-white/5" />
-              <div className="h-4 w-4/5 animate-pulse rounded bg-white/5" />
+              <div className="h-5 w-1/2 animate-pulse rounded bg-neutral-300" />
+              <div className="h-4 w-full animate-pulse rounded bg-neutral-300" />
+              <div className="h-4 w-4/5 animate-pulse rounded bg-neutral-300" />
             </li>
           ))}
         </ol>
 
-        <p className="text-sm text-zinc-500">{t('result.loading')}</p>
+        <p className="text-sm text-neutral-600">{t('result.loading')}</p>
       </div>
     );
   }
@@ -206,8 +206,8 @@ export function ResultScreen({ sessionId }: { sessionId: string }) {
   return (
     <div className="space-y-10">
       <header className="space-y-3">
-        <p className="text-xs uppercase tracking-widest text-emerald-400">Результат пробы</p>
-        <h1 className="text-3xl font-semibold text-zinc-100">{t('result.title')}</h1>
+        <p className="text-xs uppercase tracking-widest text-accent-700">Результат пробы</p>
+        <h1 className="text-3xl font-semibold text-ink">{t('result.title')}</h1>
         <ProfileBar signals={result.profile} />
       </header>
 
@@ -221,7 +221,7 @@ export function ResultScreen({ sessionId }: { sessionId: string }) {
             {VERDICT_TONE[verdict.kind].heading}
           </h2>
 
-          <p className="mt-3 text-[15px] leading-relaxed text-zinc-200">
+          <p className="mt-3 text-[15px] leading-relaxed text-ink">
             До теста — «{expectation}».{' '}
             {verdict.kind === 'unsure' && `Теперь есть с чего начать: ${verdict.top}.`}
             {verdict.kind === 'confirmed' && 'Разговор привёл ровно туда же.'}
@@ -230,7 +230,7 @@ export function ResultScreen({ sessionId }: { sessionId: string }) {
             {verdict.kind === 'diverged' && `Разговор привёл к другому: ${verdict.top}.`}
           </p>
 
-          <p className="mt-3 text-sm leading-relaxed text-zinc-400">
+          <p className="mt-3 text-sm leading-relaxed text-neutral-700">
             {VERDICT_TONE[verdict.kind].note}
           </p>
         </section>
@@ -243,24 +243,24 @@ export function ResultScreen({ sessionId }: { sessionId: string }) {
           // первым. Шаг маленький, вся тройка на месте меньше чем за полсекунды.
           <li
             key={m.profession?.id ?? i}
-            className="enter-up rounded-2xl border border-white/10 bg-white/[0.03] p-5"
+            className="enter-up rounded-2xl border border-divider bg-surface p-5"
             style={{ animationDelay: `${i * 90}ms` }}
           >
             <div className="flex items-baseline justify-between gap-4">
-              <h2 className="text-lg font-medium text-zinc-100">
+              <h2 className="text-lg font-medium text-ink">
                 {i + 1}. {m.profession?.title}
               </h2>
-              <span className="shrink-0 text-sm text-emerald-400">
+              <span className="shrink-0 text-sm text-accent-700">
                 {Math.round(m.fit * 100)}%
               </span>
             </div>
-            <p className="mt-2 text-sm leading-relaxed text-zinc-300">{m.because}</p>
+            <p className="mt-2 text-sm leading-relaxed text-neutral-800">{m.because}</p>
 
             {m.labourMarket && (
-              <dl className="mt-4 grid grid-cols-2 gap-3 border-t border-white/5 pt-4 text-sm sm:grid-cols-3">
+              <dl className="mt-4 grid grid-cols-2 gap-3 border-t border-divider pt-4 text-sm sm:grid-cols-3">
                 <div>
-                  <dt className="text-xs text-zinc-500">{t('result.market.salary')}</dt>
-                  <dd className="text-zinc-200">
+                  <dt className="text-xs text-neutral-600">{t('result.market.salary')}</dt>
+                  <dd className="text-ink">
                     {m.labourMarket.medianSalaryKzt
                       ? `${tenge.format(m.labourMarket.medianSalaryKzt)} ₸`
                       : '—'}
@@ -271,24 +271,24 @@ export function ResultScreen({ sessionId }: { sessionId: string }) {
                     поломка, а не как «данных нет». */}
                 {m.labourMarket.vacancyCount != null && (
                   <div>
-                    <dt className="text-xs text-zinc-500">открытых вакансий</dt>
-                    <dd className="text-zinc-200">{m.labourMarket.vacancyCount}</dd>
+                    <dt className="text-xs text-neutral-600">открытых вакансий</dt>
+                    <dd className="text-ink">{m.labourMarket.vacancyCount}</dd>
                   </div>
                 )}
                 {m.labourMarket.demandTrend && (
                   <div className="col-span-2 sm:col-span-1">
-                    <dt className="text-xs text-zinc-500">спрос</dt>
-                    <dd className="text-zinc-200">{m.labourMarket.demandTrend}</dd>
+                    <dt className="text-xs text-neutral-600">спрос</dt>
+                    <dd className="text-ink">{m.labourMarket.demandTrend}</dd>
                   </div>
                 )}
                 {m.labourMarket.regions && (
                   <div className="col-span-2 sm:col-span-3">
-                    <dt className="text-xs text-zinc-500">{t('result.market.where')}</dt>
-                    <dd className="text-zinc-200">{m.labourMarket.regions.join(', ')}</dd>
+                    <dt className="text-xs text-neutral-600">{t('result.market.where')}</dt>
+                    <dd className="text-ink">{m.labourMarket.regions.join(', ')}</dd>
                   </div>
                 )}
                 <div className="col-span-2 sm:col-span-3">
-                  <dd className="text-xs text-zinc-500">
+                  <dd className="text-xs text-neutral-600">
                     {t('result.market.source', { source: m.labourMarket.source })}
                   </dd>
                 </div>
@@ -301,7 +301,7 @@ export function ResultScreen({ sessionId }: { sessionId: string }) {
                 деле это единственный честный вариант. Придумать медиану под
                 подписью «enbek.kz» нельзя. */}
             {!m.labourMarket && (
-              <p className="mt-4 border-t border-white/5 pt-4 text-xs leading-relaxed text-zinc-500">
+              <p className="mt-4 border-t border-divider pt-4 text-xs leading-relaxed text-neutral-600">
                 Данных рынка труда по этой профессии у нас пока нет — выгрузка
                 собрана не по всем направлениям, а придумывать цифры мы не стали.
               </p>
@@ -313,11 +313,11 @@ export function ResultScreen({ sessionId }: { sessionId: string }) {
       {/* Проба вынесена из теста: разговор заканчивается результатом, а работу
           руками человек пробует по своему выбору — уже зная, что ему подобрали. */}
       {!result.trial.done && (
-        <section className="rounded-2xl border border-emerald-500/30 bg-emerald-500/[0.06] p-5">
-          <h2 className="text-lg font-medium text-emerald-300">
+        <section className="rounded-2xl border border-accent-300 bg-accent-100 p-5">
+          <h2 className="text-lg font-medium text-accent-700">
             {result.trial.answered > 0 ? 'Проба не закончена' : 'А каково это на самом деле?'}
           </h2>
-          <p className="mt-2 text-sm leading-relaxed text-zinc-300">
+          <p className="mt-2 text-sm leading-relaxed text-neutral-800">
             {result.matches[0]?.profession?.title
               ? `Пять минут настоящей работы: ${result.matches[0].profession.title.toLowerCase()}. `
               : 'Пять минут настоящей работы. '}
@@ -326,11 +326,11 @@ export function ResultScreen({ sessionId }: { sessionId: string }) {
           </p>
           <Link
             href={`/trial/${sessionId}`}
-            className="mt-4 inline-block rounded-xl bg-emerald-500 px-5 py-2.5 text-sm font-medium text-emerald-950 transition hover:bg-emerald-400"
+            className="mt-4 inline-block rounded-xl bg-accent px-5 py-2.5 text-sm font-medium text-page transition hover:bg-accent-600"
           >
             {result.trial.answered > 0 ? 'Продолжить пробу' : 'Попробовать'}
           </Link>
-          <p className="mt-3 text-xs text-zinc-500">
+          <p className="mt-3 text-xs text-neutral-600">
             Займёт пару минут и даст ещё {result.trial.rewardCoins} очков — как раз на
             разбор от наставника.
           </p>
@@ -341,29 +341,29 @@ export function ResultScreen({ sessionId }: { sessionId: string }) {
           Дальше — что с этим делать, и только потом всё остальное. */}
       <CareerPlan sessionId={sessionId} profession={result.matches[0]?.profession?.title} />
 
-      <section className="relative rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+      <section className="relative rounded-2xl border border-divider bg-surface p-5">
         {burst && (
           <span
             role="status"
-            className="float-away pointer-events-none absolute right-5 top-5 rounded-full bg-emerald-500/20 px-3 py-1 text-sm font-medium text-emerald-300"
+            className="float-away pointer-events-none absolute right-5 top-5 rounded-full bg-accent-200 px-3 py-1 text-sm font-medium text-accent-700"
           >
             +{burst.xp} XP · +{burst.coins} очков
           </span>
         )}
-        <h2 className="text-lg font-medium text-zinc-100">
+        <h2 className="text-lg font-medium text-ink">
           {claimed ? 'Прохождение сохранено' : 'Сохрани результат и получи очки'}
         </h2>
         {claimed ? (
-          <p className="mt-2 text-sm leading-relaxed text-zinc-400">
+          <p className="mt-2 text-sm leading-relaxed text-neutral-700">
             Оно лежит в{' '}
-            <Link href="/me" className="text-emerald-400 underline-offset-2 hover:underline">
+            <Link href="/me" className="text-accent-700 underline-offset-2 hover:underline">
               твоём профиле
             </Link>{' '}
             — вернёшься к нему в любой момент.
           </p>
         ) : (
           <>
-            <p className="mt-2 text-sm leading-relaxed text-zinc-400">
+            <p className="mt-2 text-sm leading-relaxed text-neutral-700">
               {result.reward.xp} XP и {result.reward.coins} очков за пройденную пробу.
               Очков хватит на разбор от наставника — он стоит {result.reward.mentorCost}.
             </p>
@@ -371,24 +371,24 @@ export function ResultScreen({ sessionId }: { sessionId: string }) {
               <button
                 onClick={claim}
                 disabled={claiming}
-                className="mt-4 rounded-xl bg-emerald-500 px-5 py-2.5 text-sm font-medium text-emerald-950 transition hover:bg-emerald-400 disabled:opacity-50"
+                className="mt-4 rounded-xl bg-accent px-5 py-2.5 text-sm font-medium text-page transition hover:bg-accent-600 disabled:opacity-50"
               >
                 {claiming ? 'Сохраняю…' : `Сохранить как ${user?.name ?? 'я'}`}
               </button>
             ) : (
               <Link
                 href={`/me?claim=${sessionId}`}
-                className="mt-4 inline-block rounded-xl bg-emerald-500 px-5 py-2.5 text-sm font-medium text-emerald-950 transition hover:bg-emerald-400"
+                className="mt-4 inline-block rounded-xl bg-accent px-5 py-2.5 text-sm font-medium text-page transition hover:bg-accent-600"
               >
                 Завести аккаунт и сохранить
               </Link>
             )}
-            <p className="mt-3 text-xs leading-relaxed text-zinc-500">
+            <p className="mt-3 text-xs leading-relaxed text-neutral-600">
               Ни почты, ни пароля не спросим — только имя, класс и город.
             </p>
           </>
         )}
-        {error && <p className="mt-3 text-sm text-rose-400">{error}</p>}
+        {error && <p className="mt-3 text-sm text-danger">{error}</p>}
       </section>
 
       <MentorReview
@@ -398,33 +398,33 @@ export function ResultScreen({ sessionId }: { sessionId: string }) {
         cost={result.reward.mentorCost}
       />
 
-      <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+      <section className="rounded-2xl border border-divider bg-surface p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-lg font-medium text-zinc-100">Письмо родителям</h2>
+          <h2 className="text-lg font-medium text-ink">Письмо родителям</h2>
           <AiBadge />
         </div>
-        <p className="mt-2 text-sm text-zinc-400">
+        <p className="mt-2 text-sm text-neutral-700">
           Разговор с родителями — самая тяжёлая часть выбора. Это письмо можно показать им.
         </p>
 
         {letterState === 'idle' ? (
           <button
             onClick={writeLetter}
-            className="mt-4 rounded-xl bg-emerald-500 px-5 py-2.5 text-sm font-medium text-emerald-950 transition hover:bg-emerald-400"
+            className="mt-4 rounded-xl bg-accent px-5 py-2.5 text-sm font-medium text-page transition hover:bg-accent-600"
           >
             Написать письмо
           </button>
         ) : (
-          <article className="mt-4 whitespace-pre-wrap text-[15px] leading-relaxed text-zinc-200">
+          <article className="mt-4 whitespace-pre-wrap text-[15px] leading-relaxed text-ink">
             {letter}
             {letterState === 'streaming' && (
-              <span className="ml-0.5 inline-block h-4 w-[2px] animate-pulse bg-emerald-400 align-middle" />
+              <span className="ml-0.5 inline-block h-4 w-[2px] animate-pulse bg-accent align-middle" />
             )}
           </article>
         )}
       </section>
 
-      <p className="border-t border-white/5 pt-6 text-xs leading-relaxed text-zinc-500">
+      <p className="border-t border-divider pt-6 text-xs leading-relaxed text-neutral-600">
         {result.disclaimer}
       </p>
     </div>

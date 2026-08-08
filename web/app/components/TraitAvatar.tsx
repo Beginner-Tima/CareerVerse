@@ -2,79 +2,45 @@
  * Аватар, который подросток не выбирает, а зарабатывает ответами.
  *
  * Берётся сильнейшая черта накопленного профиля — та же, что стоит первой
- * строкой в ProfileBar, — и превращается в знак с своим цветом. Пока идёт тест,
- * профиль пересобирается после каждого ответа, и аватар меняется вместе с ним:
- * это самая наглядная демонстрация того, что тест адаптивный, а не опрос с
- * заранее известным концом.
+ * строкой в ProfileBar, — и превращается в знак. Пока идёт тест, профиль
+ * пересобирается после каждого ответа, и аватар меняется вместе с ним: это
+ * самая наглядная демонстрация того, что тест адаптивный, а не опрос с заранее
+ * известным концом.
  *
  * Почему не загрузка картинки. Её пришлось бы где-то хранить и кем-то
  * модерировать — продукт для подростков, чужие изображения в нём это отдельная
  * ответственность. А главное, выбранная картинка ничего не говорит о человеке,
  * тогда как эта собрана из его же слов.
  *
+ * Различает черты знак, а не цвет: подложка у всех одна, акцентная. Это правило
+ * дизайн-гайда — один акцент на продукт, — и оно же страховка от дальтонизма,
+ * потому что шестнадцать оттенков в ряд различимы не для всех. Сами эмодзи
+ * цветные, разнообразия хватает и без палитры.
+ *
  * Словарь черт у модели открытый, как и в ProfileBar: незнакомый код получит
- * первую букву и цвет из хеша, а не заглушку. Аватар будет странным, но
- * устойчивым — один и тот же код всегда даст один и тот же вид.
+ * первую букву вместо знака. Странно, но устойчиво — один и тот же код всегда
+ * даст один и тот же вид.
  */
 import type { Signal } from '../lib/api';
 
-interface Face {
-  glyph: string;
-  /** Классы целиком, а не собранные из кусков: Tailwind ищет их в исходнике. */
-  tone: string;
-}
-
-const FACES: Record<string, Face> = {
-  'systems-thinking': { glyph: '🧩', tone: 'bg-sky-500/15 text-sky-300 ring-sky-400/30' },
-  'care-for-people': { glyph: '🤲', tone: 'bg-rose-500/15 text-rose-300 ring-rose-400/30' },
-  'hands-on': { glyph: '🔧', tone: 'bg-amber-500/15 text-amber-300 ring-amber-400/30' },
-  'attention-to-detail': { glyph: '🔍', tone: 'bg-teal-500/15 text-teal-300 ring-teal-400/30' },
-  'creative-expression': {
-    glyph: '🎨',
-    tone: 'bg-fuchsia-500/15 text-fuchsia-300 ring-fuchsia-400/30',
-  },
-  'problem-solving': {
-    glyph: '🧠',
-    tone: 'bg-emerald-500/15 text-emerald-300 ring-emerald-400/30',
-  },
-  communication: { glyph: '💬', tone: 'bg-sky-500/15 text-sky-300 ring-sky-400/30' },
-  leadership: { glyph: '🚩', tone: 'bg-orange-500/15 text-orange-300 ring-orange-400/30' },
-  independence: { glyph: '🧭', tone: 'bg-indigo-500/15 text-indigo-300 ring-indigo-400/30' },
-  teamwork: { glyph: '🤝', tone: 'bg-emerald-500/15 text-emerald-300 ring-emerald-400/30' },
-  analytical: { glyph: '📊', tone: 'bg-violet-500/15 text-violet-300 ring-violet-400/30' },
-  curiosity: { glyph: '🔭', tone: 'bg-cyan-500/15 text-cyan-300 ring-cyan-400/30' },
-  persistence: { glyph: '🪨', tone: 'bg-stone-500/20 text-stone-300 ring-stone-400/30' },
-  'helping-others': { glyph: '💚', tone: 'bg-rose-500/15 text-rose-300 ring-rose-400/30' },
-  organizing: { glyph: '🗂', tone: 'bg-lime-500/15 text-lime-300 ring-lime-400/30' },
-  'risk-taking': { glyph: '🎲', tone: 'bg-red-500/15 text-red-300 ring-red-400/30' },
+const GLYPHS: Record<string, string> = {
+  'systems-thinking': '🧩',
+  'care-for-people': '🤲',
+  'hands-on': '🔧',
+  'attention-to-detail': '🔍',
+  'creative-expression': '🎨',
+  'problem-solving': '🧠',
+  communication: '💬',
+  leadership: '🚩',
+  independence: '🧭',
+  teamwork: '🤝',
+  analytical: '📊',
+  curiosity: '🔭',
+  persistence: '🪨',
+  'helping-others': '💚',
+  organizing: '🗂',
+  'risk-taking': '🎲',
 };
-
-/** Запасные цвета для черт, которых нет в словаре выше. */
-const SPARE_TONES = [
-  'bg-sky-500/15 text-sky-300 ring-sky-400/30',
-  'bg-amber-500/15 text-amber-300 ring-amber-400/30',
-  'bg-violet-500/15 text-violet-300 ring-violet-400/30',
-  'bg-teal-500/15 text-teal-300 ring-teal-400/30',
-  'bg-rose-500/15 text-rose-300 ring-rose-400/30',
-];
-
-const NEUTRAL = 'bg-white/[0.06] text-zinc-400 ring-white/10';
-
-/** Не криптография, а способ дать незнакомой черте стабильный цвет. */
-function hash(s: string): number {
-  let h = 0;
-  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
-  return Math.abs(h);
-}
-
-function faceOf(trait: string): Face {
-  const known = FACES[trait];
-  if (known) return known;
-  return {
-    glyph: (trait[0] ?? '?').toUpperCase(),
-    tone: SPARE_TONES[hash(trait) % SPARE_TONES.length],
-  };
-}
 
 /**
  * Сильнейшая черта профиля. Вынесена наружу, потому что нужна не только
@@ -109,15 +75,18 @@ export function TraitAvatar({
   title?: string;
   className?: string;
 }) {
-  const face = trait ? faceOf(trait) : { glyph: '·', tone: NEUTRAL };
+  const glyph = trait ? (GLYPHS[trait] ?? trait[0]?.toUpperCase() ?? '?') : '·';
+  const tone = trait
+    ? 'bg-accent-100 text-accent-800 ring-accent-300'
+    : 'bg-surface text-neutral-500 ring-neutral-300';
 
   return (
     <span
       title={title}
       aria-hidden={!title}
-      className={`grid shrink-0 place-items-center rounded-2xl ring-1 ${SIZES[size]} ${face.tone} ${className}`}
+      className={`grid shrink-0 place-items-center rounded-md ring-1 ${SIZES[size]} ${tone} ${className}`}
     >
-      {face.glyph}
+      {glyph}
     </span>
   );
 }

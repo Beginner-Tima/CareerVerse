@@ -38,12 +38,12 @@ export function CareerPlan({
   }
 
   return (
-    <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+    <section className="rounded-2xl border border-divider bg-surface p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-lg font-medium text-zinc-100">Что делать дальше</h2>
+        <h2 className="text-lg font-medium text-ink">Что делать дальше</h2>
         <AiBadge />
       </div>
-      <p className="mt-2 text-sm leading-relaxed text-zinc-400">
+      <p className="mt-2 text-sm leading-relaxed text-neutral-700">
         {profession
           ? `Что сделать в ближайший месяц, какие предметы ЕНТ и куда поступать, чтобы работать: ${profession.toLowerCase()}.`
           : 'Что сделать в ближайший месяц, какие предметы ЕНТ и куда поступать.'}
@@ -57,12 +57,12 @@ export function CareerPlan({
               onChange={(e) => setContext(e.target.value)}
               rows={3}
               placeholder="Например: живу в Шымкенте, по математике 4, уезжать из города не планирую."
-              className="w-full resize-none rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-sm leading-relaxed text-zinc-100 outline-none transition placeholder:text-zinc-600 focus:border-emerald-500/50"
+              className="w-full resize-none rounded-2xl border border-divider bg-surface p-4 text-sm leading-relaxed text-ink outline-none transition placeholder:text-neutral-500 focus:border-accent"
             />
           ) : (
             <button
               onClick={() => setShowContext(true)}
-              className="text-sm text-zinc-400 underline-offset-2 hover:text-zinc-200 hover:underline"
+              className="text-sm text-neutral-700 underline-offset-2 hover:text-ink hover:underline"
             >
               Рассказать о себе, чтобы план был точнее
             </button>
@@ -71,14 +71,14 @@ export function CareerPlan({
           <button
             onClick={load}
             disabled={busy}
-            className="block rounded-xl bg-emerald-500 px-5 py-2.5 text-sm font-medium text-emerald-950 transition hover:bg-emerald-400 disabled:opacity-50"
+            className="block rounded-xl bg-accent px-5 py-2.5 text-sm font-medium text-page transition hover:bg-accent-600 disabled:opacity-50"
           >
             {busy ? 'Собираю путь…' : 'Показать путь'}
           </button>
         </div>
       )}
 
-      {error && <p className="mt-3 text-sm text-rose-400">{error}</p>}
+      {error && <p className="mt-3 text-sm text-danger">{error}</p>}
 
       {plan && (
         <div className="mt-5 space-y-5 text-sm leading-relaxed">
@@ -86,14 +86,14 @@ export function CareerPlan({
               этом блоке — горизонт в годы: ЕНТ, вуз, первая работа. Подросток
               закроет вкладку, если между «сегодня» и «профессией» не окажется
               шага, который делается на этой неделе. */}
-          <div className="rounded-xl border border-emerald-500/25 bg-emerald-500/[0.06] p-4">
-            <h3 className="text-xs uppercase tracking-widest text-emerald-300">
+          <div className="rounded-xl border border-accent-300 bg-accent-100 p-4">
+            <h3 className="text-xs uppercase tracking-widest text-accent-700">
               Ближайший месяц
             </h3>
-            <ul className="mt-2.5 space-y-2 text-zinc-200">
+            <ul className="mt-2.5 space-y-2 text-ink">
               {plan.nextMonth.map((item, i) => (
                 <li key={i} className="flex gap-2.5">
-                  <span className="shrink-0 text-emerald-400/70 tabular-nums">{i + 1}</span>
+                  <span className="shrink-0 text-accent-700/70 tabular-nums">{i + 1}</span>
                   <span>{item}</span>
                 </li>
               ))}
@@ -101,36 +101,36 @@ export function CareerPlan({
           </div>
 
           <div>
-            <h3 className="text-xs uppercase tracking-widest text-emerald-400">Предметы ЕНТ</h3>
-            <p className="mt-1.5 text-zinc-200">{plan.entSubjects.join(' · ')}</p>
+            <h3 className="text-xs uppercase tracking-widest text-accent-700">Предметы ЕНТ</h3>
+            <p className="mt-1.5 text-ink">{plan.entSubjects.join(' · ')}</p>
           </div>
 
           <div>
-            <h3 className="text-xs uppercase tracking-widest text-emerald-400">Куда поступать</h3>
+            <h3 className="text-xs uppercase tracking-widest text-accent-700">Куда поступать</h3>
             <ul className="mt-2 space-y-2.5">
               {plan.universities.map((u, i) => (
-                <li key={i} className="border-l-2 border-white/10 pl-3">
-                  <p className="text-zinc-200">
-                    {u.name} <span className="text-zinc-500">· {u.city}</span>
+                <li key={i} className="border-l-2 border-divider pl-3">
+                  <p className="text-ink">
+                    {u.name} <span className="text-neutral-600">· {u.city}</span>
                   </p>
-                  <p className="text-zinc-400">{u.why}</p>
+                  <p className="text-neutral-700">{u.why}</p>
                 </li>
               ))}
             </ul>
           </div>
 
           <div>
-            <h3 className="text-xs uppercase tracking-widest text-emerald-400">
+            <h3 className="text-xs uppercase tracking-widest text-accent-700">
               Английский и IELTS
             </h3>
-            <p className="mt-1.5 text-zinc-300">{plan.languages}</p>
+            <p className="mt-1.5 text-neutral-800">{plan.languages}</p>
           </div>
 
           <div>
-            <h3 className="text-xs uppercase tracking-widest text-emerald-400">
+            <h3 className="text-xs uppercase tracking-widest text-accent-700">
               Чтобы взяли на работу
             </h3>
-            <ul className="mt-2 space-y-1.5 text-zinc-300">
+            <ul className="mt-2 space-y-1.5 text-neutral-800">
               {plan.toGetHired.map((item, i) => (
                 <li key={i}>— {item}</li>
               ))}
@@ -139,7 +139,7 @@ export function CareerPlan({
 
           {/* Вузы — единственное место, где модель может уверенно соврать
               названием программы. Дисклеймер здесь не формальность. */}
-          <p className="border-t border-white/5 pt-4 text-xs text-zinc-500">{disclaimer}</p>
+          <p className="border-t border-divider pt-4 text-xs text-neutral-600">{disclaimer}</p>
         </div>
       )}
     </section>

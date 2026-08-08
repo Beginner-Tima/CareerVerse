@@ -26,9 +26,9 @@ function Bar({ weight }: { weight: number }) {
   }, []);
 
   return (
-    <div className="h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
+    <div className="h-1.5 overflow-hidden rounded-full bg-neutral-300">
       <div
-        className="h-full rounded-full bg-emerald-400/80 transition-[width] duration-700 ease-out"
+        className="h-full rounded-full bg-accent transition-[width] duration-700 ease-out"
         style={{ width: grown ? `${percent(weight)}%` : '0%' }}
       />
     </div>
@@ -51,7 +51,7 @@ export function ProfileBar({ signals }: { signals: Signal[] }) {
   const top = topTraitOf(signals);
 
   return (
-    <div className="space-y-3 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+    <div className="space-y-3 rounded-2xl border border-divider bg-surface p-4">
       <div className="flex items-center gap-3">
         {/* Ключ по черте, а не по индексу: сменилась сильнейшая — знак
             монтируется заново и проигрывает появление. Без ключа React
@@ -64,11 +64,11 @@ export function ProfileBar({ signals }: { signals: Signal[] }) {
           className="enter-up"
         />
         <div className="min-w-0">
-          <p className="text-xs uppercase tracking-widest text-zinc-500">
+          <p className="text-xs uppercase tracking-widest text-neutral-600">
             {t('profile.title')}
           </p>
           {top && (
-            <p className="truncate text-sm text-zinc-300">
+            <p className="truncate text-sm text-neutral-800">
               {t('profile.top', { trait: t.trait(top) })}
             </p>
           )}
@@ -81,8 +81,8 @@ export function ProfileBar({ signals }: { signals: Signal[] }) {
           // что профиль собран из слов человека, а не из шкалы опросника.
           <li key={s.trait} className="space-y-1.5" title={s.evidence}>
             <div className="flex items-baseline justify-between gap-3">
-              <span className="text-sm text-zinc-200">{t.trait(s.trait)}</span>
-              <span className="shrink-0 text-xs tabular-nums text-zinc-500">
+              <span className="text-sm text-ink">{t.trait(s.trait)}</span>
+              <span className="shrink-0 text-xs tabular-nums text-neutral-600">
                 {percent(s.weight)}%
               </span>
             </div>
@@ -92,7 +92,7 @@ export function ProfileBar({ signals }: { signals: Signal[] }) {
       </ul>
 
       {hidden > 0 && (
-        <p className="text-xs text-zinc-600">{t('profile.more', { n: hidden })}</p>
+        <p className="text-xs text-neutral-500">{t('profile.more', { n: hidden })}</p>
       )}
     </div>
   );

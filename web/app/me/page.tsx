@@ -94,31 +94,31 @@ function ProfileInner() {
     }
   }
 
-  if (!ready) return <p className="text-zinc-500">Секунду…</p>;
+  if (!ready) return <p className="text-neutral-600">Секунду…</p>;
 
   // ─── Вошедший: профиль и история ───
   if (token && me) {
     return (
       <div className="space-y-8">
         <header className="space-y-2">
-          <h1 className="text-3xl font-semibold text-zinc-100">{me.user.name}</h1>
-          <p className="text-sm text-zinc-400">
+          <h1 className="text-3xl font-semibold text-ink">{me.user.name}</h1>
+          <p className="text-sm text-neutral-700">
             {me.user.grade} класс{me.user.city ? `, ${me.user.city}` : ''}
           </p>
         </header>
 
         <dl className="grid grid-cols-3 gap-3">
           {[
-            { label: 'очки', value: me.user.coins, accent: 'text-amber-300' },
-            { label: 'XP', value: me.user.xp, accent: 'text-emerald-300' },
-            { label: 'уровень', value: me.user.level, accent: 'text-zinc-100' },
+            { label: 'очки', value: me.user.coins, accent: 'text-accent-700' },
+            { label: 'XP', value: me.user.xp, accent: 'text-accent-700' },
+            { label: 'уровень', value: me.user.level, accent: 'text-ink' },
           ].map((stat) => (
             <div
               key={stat.label}
-              className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-center"
+              className="rounded-2xl border border-divider bg-surface p-4 text-center"
             >
               <dd className={`text-2xl font-semibold ${stat.accent}`}>{stat.value}</dd>
-              <dt className="mt-1 text-xs uppercase tracking-widest text-zinc-500">
+              <dt className="mt-1 text-xs uppercase tracking-widest text-neutral-600">
                 {stat.label}
               </dt>
             </div>
@@ -126,12 +126,12 @@ function ProfileInner() {
         </dl>
 
         {issuedCode && (
-          <section className="rounded-2xl border border-amber-500/30 bg-amber-500/[0.07] p-5">
-            <h2 className="text-sm font-medium text-amber-200">Твой код входа</h2>
-            <p className="mt-2 font-mono text-2xl tracking-widest text-amber-100">
+          <section className="rounded-2xl border border-accent-300 bg-accent-100 p-5">
+            <h2 className="text-sm font-medium text-accent-800">Твой код входа</h2>
+            <p className="mt-2 font-mono text-2xl tracking-widest text-accent-900">
               {issuedCode}
             </p>
-            <p className="mt-2 text-xs leading-relaxed text-amber-200/70">
+            <p className="mt-2 text-xs leading-relaxed text-accent-800/80">
               Запиши его. Почту и телефон мы не спрашиваем, поэтому восстановить
               доступ без кода не сможем.
             </p>
@@ -139,11 +139,11 @@ function ProfileInner() {
         )}
 
         <section className="space-y-3">
-          <h2 className="text-lg font-medium text-zinc-100">Мои прохождения</h2>
+          <h2 className="text-lg font-medium text-ink">Мои прохождения</h2>
           {me.history.length === 0 ? (
-            <p className="text-sm text-zinc-400">
+            <p className="text-sm text-neutral-700">
               Пока ни одного.{' '}
-              <Link href="/test" className="text-emerald-400 underline-offset-2 hover:underline">
+              <Link href="/test" className="text-accent-700 underline-offset-2 hover:underline">
                 Пройти пробу
               </Link>
               .
@@ -154,11 +154,11 @@ function ProfileInner() {
                 <li key={entry.sessionId}>
                   <Link
                     href={`/result/${entry.sessionId}`}
-                    className="flex items-center justify-between gap-4 rounded-2xl border border-white/10 bg-white/[0.03] p-4 transition hover:bg-white/[0.06]"
+                    className="flex items-center justify-between gap-4 rounded-2xl border border-divider bg-surface p-4 transition hover:bg-neutral-200"
                   >
                     <div>
-                      <p className="text-zinc-100">{entry.topProfession ?? 'Прохождение'}</p>
-                      <p className="mt-0.5 text-xs text-zinc-500">
+                      <p className="text-ink">{entry.topProfession ?? 'Прохождение'}</p>
+                      <p className="mt-0.5 text-xs text-neutral-600">
                         {entry.completedAt
                           ? new Date(entry.completedAt).toLocaleDateString('ru-KZ', {
                               day: 'numeric',
@@ -168,7 +168,7 @@ function ProfileInner() {
                         {entry.hasMentorReview && ' · есть разбор наставника'}
                       </p>
                     </div>
-                    <span aria-hidden className="text-zinc-600">
+                    <span aria-hidden className="text-neutral-500">
                       →
                     </span>
                   </Link>
@@ -183,7 +183,7 @@ function ProfileInner() {
             clearSession();
             setMe(null);
           }}
-          className="text-sm text-zinc-500 underline-offset-2 hover:text-zinc-300 hover:underline"
+          className="text-sm text-neutral-600 underline-offset-2 hover:text-neutral-800 hover:underline"
         >
           Выйти
         </button>
@@ -195,10 +195,10 @@ function ProfileInner() {
   return (
     <div className="space-y-8">
       <header className="space-y-3">
-        <h1 className="text-3xl font-semibold text-zinc-100">
+        <h1 className="text-3xl font-semibold text-ink">
           {mode === 'register' ? 'Заведём аккаунт' : 'Вход по коду'}
         </h1>
-        <p className="text-[15px] leading-relaxed text-zinc-400">
+        <p className="text-[15px] leading-relaxed text-neutral-700">
           {mode === 'register'
             ? 'Ни почты, ни пароля: тебе нет восемнадцати, и собирать твои контакты мы не хотим. Имя, класс и город — всё.'
             : 'Введи код, который выдали при регистрации.'}
@@ -206,7 +206,7 @@ function ProfileInner() {
       </header>
 
       {pendingClaim && (
-        <p className="rounded-2xl border border-emerald-500/25 bg-emerald-500/[0.06] p-4 text-sm text-emerald-200">
+        <p className="rounded-2xl border border-accent-300 bg-accent-100 p-4 text-sm text-accent-800">
           Как только войдёшь, прохождение сохранится в профиль и очки начислятся.
         </p>
       )}
@@ -214,17 +214,17 @@ function ProfileInner() {
       {mode === 'register' ? (
         <div className="space-y-5">
           <label className="block space-y-2">
-            <span className="text-sm text-zinc-300">Как тебя звать</span>
+            <span className="text-sm text-neutral-800">Как тебя звать</span>
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Можно просто имя"
-              className="w-full rounded-2xl border border-white/10 bg-white/[0.03] p-3.5 text-[15px] text-zinc-100 outline-none transition placeholder:text-zinc-600 focus:border-emerald-500/50"
+              className="w-full rounded-2xl border border-divider bg-surface p-3.5 text-[15px] text-ink outline-none transition placeholder:text-neutral-500 focus:border-accent"
             />
           </label>
 
           <div className="space-y-2">
-            <span className="text-sm text-zinc-300">Класс</span>
+            <span className="text-sm text-neutral-800">Класс</span>
             <div className="flex flex-wrap gap-2">
               {GRADES.map((g) => (
                 <button
@@ -232,8 +232,8 @@ function ProfileInner() {
                   onClick={() => setGrade(g)}
                   className={`rounded-xl border px-4 py-2 text-sm transition ${
                     grade === g
-                      ? 'border-emerald-500/60 bg-emerald-500/15 text-emerald-300'
-                      : 'border-white/10 text-zinc-300 hover:bg-white/5'
+                      ? 'border-accent bg-accent-100 text-accent-700'
+                      : 'border-divider text-neutral-800 hover:bg-neutral-200'
                   }`}
                 >
                   {g}
@@ -243,21 +243,21 @@ function ProfileInner() {
           </div>
 
           <label className="block space-y-2">
-            <span className="text-sm text-zinc-300">Город — по желанию</span>
+            <span className="text-sm text-neutral-800">Город — по желанию</span>
             <input
               value={city}
               onChange={(e) => setCity(e.target.value)}
               placeholder="Нужен для советов про вузы и работу"
-              className="w-full rounded-2xl border border-white/10 bg-white/[0.03] p-3.5 text-[15px] text-zinc-100 outline-none transition placeholder:text-zinc-600 focus:border-emerald-500/50"
+              className="w-full rounded-2xl border border-divider bg-surface p-3.5 text-[15px] text-ink outline-none transition placeholder:text-neutral-500 focus:border-accent"
             />
           </label>
 
-          {error && <p className="text-sm text-rose-400">{error}</p>}
+          {error && <p className="text-sm text-danger">{error}</p>}
 
           <button
             onClick={doRegister}
             disabled={busy}
-            className="rounded-xl bg-emerald-500 px-6 py-3 font-medium text-emerald-950 transition hover:bg-emerald-400 disabled:opacity-50"
+            className="rounded-xl bg-accent px-6 py-3 font-medium text-page transition hover:bg-accent-600 disabled:opacity-50"
           >
             {busy ? 'Создаю…' : 'Готово'}
           </button>
@@ -267,7 +267,7 @@ function ProfileInner() {
               setMode('login');
               setError(null);
             }}
-            className="block text-sm text-zinc-500 underline-offset-2 hover:text-zinc-300 hover:underline"
+            className="block text-sm text-neutral-600 underline-offset-2 hover:text-neutral-800 hover:underline"
           >
             У меня уже есть код входа
           </button>
@@ -275,21 +275,21 @@ function ProfileInner() {
       ) : (
         <div className="space-y-5">
           <label className="block space-y-2">
-            <span className="text-sm text-zinc-300">Код входа</span>
+            <span className="text-sm text-neutral-800">Код входа</span>
             <input
               value={code}
               onChange={(e) => setCode(e.target.value.toUpperCase())}
               placeholder="K7WF-3RTM"
-              className="w-full rounded-2xl border border-white/10 bg-white/[0.03] p-3.5 font-mono text-lg tracking-widest text-zinc-100 outline-none transition placeholder:text-zinc-700 focus:border-emerald-500/50"
+              className="w-full rounded-2xl border border-divider bg-surface p-3.5 font-mono text-lg tracking-widest text-ink outline-none transition placeholder:text-neutral-400 focus:border-accent"
             />
           </label>
 
-          {error && <p className="text-sm text-rose-400">{error}</p>}
+          {error && <p className="text-sm text-danger">{error}</p>}
 
           <button
             onClick={doLogin}
             disabled={busy}
-            className="rounded-xl bg-emerald-500 px-6 py-3 font-medium text-emerald-950 transition hover:bg-emerald-400 disabled:opacity-50"
+            className="rounded-xl bg-accent px-6 py-3 font-medium text-page transition hover:bg-accent-600 disabled:opacity-50"
           >
             {busy ? 'Проверяю…' : 'Войти'}
           </button>
@@ -299,7 +299,7 @@ function ProfileInner() {
               setMode('register');
               setError(null);
             }}
-            className="block text-sm text-zinc-500 underline-offset-2 hover:text-zinc-300 hover:underline"
+            className="block text-sm text-neutral-600 underline-offset-2 hover:text-neutral-800 hover:underline"
           >
             Кода нет — завести аккаунт
           </button>
@@ -314,7 +314,7 @@ export default function ProfilePage() {
     <main className="mx-auto max-w-2xl px-5 py-12">
       {/* useSearchParams требует границы Suspense — иначе весь маршрут
           выпадает в клиентский рендер целиком. */}
-      <Suspense fallback={<p className="text-zinc-500">Секунду…</p>}>
+      <Suspense fallback={<p className="text-neutral-600">Секунду…</p>}>
         <ProfileInner />
       </Suspense>
     </main>

@@ -16,7 +16,7 @@ export default function ResultPage() {
       {sessionId ? (
         <ResultScreen sessionId={sessionId} />
       ) : (
-        <p className="text-zinc-500">Не понял, какое прохождение открыть.</p>
+        <p className="text-neutral-600">Не понял, какое прохождение открыть.</p>
       )}
     </main>
   );

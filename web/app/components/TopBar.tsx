@@ -26,15 +26,15 @@ export function TopBar() {
   }, [pathname, refresh]);
 
   return (
-    <header className="sticky top-0 z-10 border-b border-white/5 bg-zinc-950/80 backdrop-blur">
+    <header className="sticky top-0 z-10 border-b border-divider bg-page/80 backdrop-blur">
       <nav className="mx-auto flex max-w-3xl items-center justify-between gap-4 px-5 py-3">
         <Link
           href="/"
-          className="group flex items-center gap-2 text-sm font-medium text-zinc-300 transition hover:text-zinc-100"
+          className="group flex items-center gap-2 text-sm font-medium text-neutral-800 transition hover:text-ink"
         >
           <span
             aria-hidden
-            className="grid size-7 place-items-center rounded-lg bg-emerald-500/15 text-emerald-400 transition group-hover:bg-emerald-500/25"
+            className="grid size-7 place-items-center rounded-lg bg-accent-100 text-accent-700 transition group-hover:bg-accent-200"
           >
             ◆
           </span>
@@ -50,20 +50,20 @@ export function TopBar() {
           <button
             onClick={() => setUiLocale(t.locale === 'kk' ? 'ru' : 'kk')}
             title={t('topbar.switchLang')}
-            className="rounded-full border border-white/10 px-2.5 py-1 text-xs font-medium text-zinc-400 transition hover:bg-white/5 hover:text-zinc-200"
+            className="rounded-full border border-divider px-2.5 py-1 text-xs font-medium text-neutral-700 transition hover:bg-neutral-200 hover:text-ink"
           >
             {t.locale === 'kk' ? 'РУС' : 'ҚАЗ'}
           </button>
 
           {!ready ? (
-            <span className="h-8 w-24 animate-pulse rounded-full bg-white/5" />
+            <span className="h-8 w-24 animate-pulse rounded-full bg-neutral-300" />
           ) : user ? (
             <Link
               href="/me"
-              className="flex items-center gap-3 rounded-full border border-white/10 bg-white/[0.03] py-1 pl-3 pr-1.5 text-sm transition hover:bg-white/[0.07]"
+              className="flex items-center gap-3 rounded-full border border-divider bg-surface py-1 pl-3 pr-1.5 text-sm transition hover:bg-neutral-200"
             >
               <span
-                className="flex items-center gap-1.5 text-amber-300"
+                className="flex items-center gap-1.5 text-accent-700"
                 title={t('topbar.points')}
               >
                 <span aria-hidden>●</span>
@@ -75,7 +75,7 @@ export function TopBar() {
               {face ? (
                 <TraitAvatar trait={face} size="sm" />
               ) : (
-                <span className="grid size-7 place-items-center rounded-full bg-emerald-500/20 text-xs font-medium text-emerald-300">
+                <span className="grid size-7 place-items-center rounded-full bg-accent-200 text-xs font-medium text-accent-700">
                   {(user.name ?? '?').slice(0, 1).toUpperCase()}
                 </span>
               )}
@@ -83,7 +83,7 @@ export function TopBar() {
           ) : (
             <Link
               href="/me"
-              className="rounded-full border border-white/10 px-4 py-1.5 text-sm text-zinc-300 transition hover:bg-white/5"
+              className="rounded-full border border-divider px-4 py-1.5 text-sm text-neutral-800 transition hover:bg-neutral-200"
             >
               {t('topbar.signin')}
             </Link>
