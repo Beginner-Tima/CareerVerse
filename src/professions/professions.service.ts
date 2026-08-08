@@ -15,8 +15,13 @@ export class ProfessionsService {
 
   async findAll() {
     return this.prisma.profession.findMany({
+      // Каталог — витрина демо, и порядок в нём смысловой: Profession.order
+      // существует именно для этого, а сортировка по алфавиту его игнорировала.
+      orderBy: { order: 'asc' },
       include: {
         levels: true,
+        // Без данных рынка труда карточка профессии — просто описание.
+        marketData: true,
       },
     });
   }

@@ -13,11 +13,17 @@ import {
   ClarifyingQuestionResult,
   TrialSchema,
   TrialResult,
+  TrialFollowUpSchema,
+  TrialFollowUpResult,
   MatchSchema,
   MatchResult,
+  MentorReviewSchema,
+  MentorReviewResult,
+  NextStepsSchema,
+  NextStepsResult,
 } from './schemas';
 import * as prompts from './prompts';
-import { DialogueTurn, Signal } from './prompts';
+import { DialogueTurn, Learner, Signal } from './prompts';
 
 // Haiku 4.5 — самая дешёвая из актуальных моделей ($1/$5 за млн токенов).
 // На демо этого хватает; поднять до claude-sonnet-5 можно одной переменной .env.
@@ -46,15 +52,17 @@ export class ClaudeService {
   }
 
   /** Разбор свободного ответа: обратная связь подростку + сигналы интересов. */
-  async assessAnswer(params: {
-    locale: Locale;
-    question: string;
-    answer: string;
-    signals: Signal[];
-  }): Promise<AssessmentResult> {
+  async assessAnswer(
+    learner: Learner,
+    params: {
+      question: string;
+      answer: string;
+      signals: Signal[];
+    },
+  ): Promise<AssessmentResult> {
     return this.parse(
       AssessmentSchema,
-      prompts.SYSTEM_ASSESS(params.locale),
+      prompts.SYSTEM_ASSESS(learner),
       prompts.userAssess(params),
       1024,
       'assess',
@@ -62,32 +70,55 @@ export class ClaudeService {
   }
 
   /** Следующий вопрос — рождается из предыдущего ответа, а не из списка. */
-  async nextClarifyingQuestion(params: {
-    locale: Locale;
-    dialogue: DialogueTurn[];
-    signals: Signal[];
-    askedCount: number;
-    totalQuestions: number;
-  }): Promise<ClarifyingQuestionResult> {
+  async nextClarifyingQuestion(
+    learner: Learner,
+    params: {
+      dialogue: DialogueTurn[];
+      signals: Signal[];
+      askedCount: number;
+      minQuestions: number;
+      maxQuestions: number;
+    },
+  ): Promise<ClarifyingQuestionResult> {
     return this.parse(
       ClarifyingQuestionSchema,
-      prompts.SYSTEM_CLARIFY(params.locale),
+      prompts.SYSTEM_CLARIFY(learner),
       prompts.userClarify(params),
       512,
       'clarify',
     );
   }
 
+  /**
+   * Тот же вопрос другими словами. Отдельный вызов, а не ветка в clarify:
+   * переспрос — это про «спросить понятнее», а не про «двигаться дальше»,
+   * и промпты у них противоположные.
+   */
+  async retryQuestion(
+    learner: Learner,
+    params: { question: string; answer: string; missing: string },
+  ): Promise<ClarifyingQuestionResult> {
+    return this.parse(
+      ClarifyingQuestionSchema,
+      prompts.SYSTEM_RETRY(learner),
+      prompts.userRetry(params),
+      512,
+      'retry',
+    );
+  }
+
   /** Сопоставление накопленного профиля с каталогом профессий. */
-  async matchProfessions(params: {
-    locale: Locale;
-    catalog: { id: string; title: string; description: string }[];
-    signals: Signal[];
-    dialogue: DialogueTurn[];
-  }): Promise<MatchResult> {
+  async matchProfessions(
+    learner: Learner,
+    params: {
+      catalog: { id: string; title: string; description: string }[];
+      signals: Signal[];
+      dialogue: DialogueTurn[];
+    },
+  ): Promise<MatchResult> {
     return this.parse(
       MatchSchema,
-      prompts.SYSTEM_MATCH(params.locale),
+      prompts.SYSTEM_MATCH(learner),
       prompts.userMatch(params),
       1024,
       'match',
@@ -95,19 +126,78 @@ export class ClaudeService {
   }
 
   /** Рабочая проба профессии под конкретного подростка. */
-  async generateTrial(params: {
-    locale: Locale;
-    professionTitle: string;
-    professionDescription: string;
-    signals: Signal[];
-    dialogue: DialogueTurn[];
-  }): Promise<TrialResult> {
+  async generateTrial(
+    learner: Learner,
+    params: {
+      professionTitle: string;
+      professionDescription: string;
+      signals: Signal[];
+      dialogue: DialogueTurn[];
+    },
+  ): Promise<TrialResult> {
     return this.parse(
       TrialSchema,
-      prompts.SYSTEM_TRIAL(params.locale),
+      prompts.SYSTEM_TRIAL(learner),
       prompts.userTrial(params),
       1500,
       'trial',
+    );
+  }
+
+  /** Второй шаг пробы: ситуация меняется из-за решения самого подростка. */
+  async generateTrialFollowUp(
+    learner: Learner,
+    params: {
+      professionTitle: string;
+      trialTitle: string;
+      scenario: string;
+      task: string;
+      answer: string;
+    },
+  ): Promise<TrialFollowUpResult> {
+    return this.parse(
+      TrialFollowUpSchema,
+      prompts.SYSTEM_TRIAL_FOLLOWUP(learner),
+      prompts.userTrialFollowUp(params),
+      1500,
+      'trial-followup',
+    );
+  }
+
+  /** Разбор пробы наставником — то, на что тратятся заработанные очки. */
+  async mentorReview(
+    learner: Learner,
+    params: {
+      professionTitle: string;
+      dialogue: DialogueTurn[];
+      signals: Signal[];
+    },
+  ): Promise<MentorReviewResult> {
+    return this.parse(
+      MentorReviewSchema,
+      prompts.SYSTEM_MENTOR(learner),
+      prompts.userMentor(params),
+      2048,
+      'mentor',
+    );
+  }
+
+  /** Путь в профессию: ЕНТ, вузы РК, язык, что нужно для первой работы. */
+  async nextSteps(
+    learner: Learner,
+    params: {
+      professionTitle: string;
+      professionDescription: string;
+      signals: Signal[];
+      context?: string | null;
+    },
+  ): Promise<NextStepsResult> {
+    return this.parse(
+      NextStepsSchema,
+      prompts.SYSTEM_NEXT_STEPS(learner),
+      prompts.userNextSteps(params),
+      2048,
+      'next-steps',
     );
   }
 
@@ -115,16 +205,18 @@ export class ClaudeService {
    * Письмо родителям — единственный длинный текст, поэтому идёт стримом:
    * на защите видно, как оно печатается, а не пустой экран на 20 секунд.
    */
-  async *streamParentLetter(params: {
-    locale: Locale;
-    dialogue: DialogueTurn[];
-    signals: Signal[];
-    topProfessions: string[];
-  }): AsyncGenerator<string> {
+  async *streamParentLetter(
+    learner: Learner,
+    params: {
+      dialogue: DialogueTurn[];
+      signals: Signal[];
+      topProfessions: string[];
+    },
+  ): AsyncGenerator<string> {
     const stream = this.client.messages.stream({
       model: this.model,
       max_tokens: 2048,
-      system: prompts.SYSTEM_PARENT_LETTER(params.locale),
+      system: prompts.SYSTEM_PARENT_LETTER(learner),
       messages: [{ role: 'user', content: prompts.userParentLetter(params) }],
     });
 

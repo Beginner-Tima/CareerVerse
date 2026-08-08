@@ -11,14 +11,27 @@ datasource db {
 // Справочник: профессии и их уровни-шаблоны
 // ---------------------------------------------------------------------------
 
+// Мы сознательно не собираем почту и пароли у подростков 14-17 лет: имя, класс
+// и город — всё, что нужно продукту, и всё, за что мы отвечаем по закону РК о
+// персональных данных несовершеннолетних. Вход обратно — по короткому коду,
+// который выдаётся при регистрации: он заменяет пару «логин + пароль».
 model User {
-  id       String         @id @default(uuid())
-  email    String         @unique
-  xp       Int            @default(0)
-  coins    Int            @default(0)
-  level    Int            @default(1)
-  progress UserProgress[]
-  sessions Session[]
+  id        String  @id @default(uuid())
+  email     String? @unique
+  name      String?
+  grade     Int?
+  city      String?
+  loginCode String? @unique
+
+  xp    Int @default(0)
+  coins Int @default(0)
+  level Int @default(1)
+
+  createdAt DateTime @default(now())
+
+  progress      UserProgress[]
+  sessions      Session[]
+  mentorReviews MentorReview[]
 }
 
 model Profession {
@@ -115,6 +128,13 @@ model Session {
   locale Locale        @default(RU)
   status SessionStatus @default(IN_PROGRESS)
 
+  // Класс спрашиваем перед стартом: 8-класснику и выпускнику перед ЕНТ нужны
+  // разные примеры и разная сложность пробы. Модель калибруется по нему.
+  grade Int?
+
+  // Награда за прохождение выдаётся один раз, в момент привязки к аккаунту.
+  claimedAt DateTime?
+
   // Закон РК № 230-VIII (с 18.01.2026): согласие на обработку ИИ фиксируется.
   consentAcceptedAt DateTime?
 
@@ -125,6 +145,8 @@ model Session {
   tasks           TaskInstance[]
   interestProfile InterestProfile?
   parentLetter    ParentLetter?
+  mentorReview    MentorReview?
+  careerPlan      CareerPlan?
 
   @@index([userId])
 }
@@ -197,6 +219,43 @@ model InterestProfile {
   topProfessions   Json?
   confidence       Float    @default(0)
   updatedAt        DateTime @updatedAt
+}
+
+// Разбор пробы наставником — единственное, на что тратятся очки. Списание
+// хранится вместе с разбором: сколько стоило, столько и списали, спорить не о чем.
+model MentorReview {
+  id        String  @id @default(uuid())
+  sessionId String  @unique
+  session   Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User    @relation(fields: [userId], references: [id])
+
+  // { didWell, gaps, monthPlan[], closing }
+  content   Json
+  costCoins Int
+
+  modelId   String
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+// Путь в профессию: ЕНТ, вузы, язык, что нужно для первой работы. Бесплатен —
+// гейтить очками то, ради чего подросток пришёл, было бы странно. Кешируется,
+// чтобы повторный заход не стоил ещё одного вызова модели.
+model CareerPlan {
+  id        String  @id @default(uuid())
+  sessionId String  @unique
+  session   Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  professionId String
+  // Что человек дописал о себе: город, оценки, обстоятельства.
+  context      String?
+  // { entSubjects[], universities[], languages, toGetHired[], nextMonth[] }
+  content      Json
+
+  modelId   String
+  createdAt DateTime @default(now())
 }
 
 // Письмо родителям — отдельный артефакт, его отдают наружу.

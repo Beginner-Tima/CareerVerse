@@ -21,5 +21,8 @@
     "noImplicitAny": false,
     "strictBindCallApply": false,
     "noFallthroughCasesInSwitch": false
-  }
+  },
+  // Фронт лежит в web/ и собирается сам, своим tsconfig с JSX и своим Next.
+  // Без этой строки nest build пытается компилировать React и падает 88 раз.
+  "exclude": ["node_modules", "dist", "web"]
 }

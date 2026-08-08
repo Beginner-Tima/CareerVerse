@@ -12,8 +12,9 @@ import {
 import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Observable } from 'rxjs';
 import { SessionsService } from './sessions.service';
-import { StartSessionDto, SubmitAnswerDto } from './dto/session.dto';
+import { CareerPlanDto, StartSessionDto, SubmitAnswerDto } from './dto/session.dto';
 import { Public } from '../auth/public.decorator';
+import { CurrentUser } from '../auth/current-user.decorator';
 
 @ApiTags('sessions')
 @Controller('sessions')
@@ -52,6 +53,50 @@ export class SessionsController {
   @ApiParam({ name: 'id', description: 'UUID сессии' })
   result(@Param('id', ParseUUIDPipe) id: string) {
     return this.sessions.result(id);
+  }
+
+  // Единственный роут прохождения за токеном — и осознанно: это уже не «пройти
+  // тест», а «положить результат себе в аккаунт и получить за него очки».
+  @Post(':id/claim')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Сохранить прохождение в аккаунт и получить награду',
+    description:
+      'Тест проходится без логина. Аккаунт предлагается после результата, сессия привязывается задним числом. Начисление одноразовое.',
+  })
+  @ApiParam({ name: 'id', description: 'UUID сессии' })
+  @ApiResponse({ status: 200, description: 'Сессия привязана, награда начислена.' })
+  @ApiResponse({ status: 409, description: 'Прохождение не закончено или уже сохранено.' })
+  claim(@Param('id', ParseUUIDPipe) id: string, @CurrentUser('id') userId: string) {
+    return this.sessions.claim(id, userId);
+  }
+
+  @Post(':id/mentor-review')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Разбор рабочей пробы наставником — за очки',
+    description: 'Списывает очки со счёта и разбирает пробу по ответам самого подростка.',
+  })
+  @ApiParam({ name: 'id', description: 'UUID сессии' })
+  @ApiResponse({ status: 200, description: 'Разбор готов (или уже был куплен раньше).' })
+  @ApiResponse({ status: 403, description: 'Прохождение принадлежит другому аккаунту.' })
+  @ApiResponse({ status: 409, description: 'Не хватает очков или проба не пройдена.' })
+  mentorReview(@Param('id', ParseUUIDPipe) id: string, @CurrentUser('id') userId: string) {
+    return this.sessions.mentorReview(id, userId);
+  }
+
+  // План бесплатен и открыт: брать плату за то, ради чего подросток пришёл,
+  // было бы странно, а требовать логин — потерять половину людей на результате.
+  @Public()
+  @Post(':id/plan')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Что делать дальше: ЕНТ, вузы РК, язык, путь к первой работе',
+    description: 'Можно дописать контекст о себе — план пересоберётся под него.',
+  })
+  @ApiParam({ name: 'id', description: 'UUID сессии' })
+  plan(@Param('id', ParseUUIDPipe) id: string, @Body() dto: CareerPlanDto) {
+    return this.sessions.careerPlan(id, dto);
   }
 
   @Public()

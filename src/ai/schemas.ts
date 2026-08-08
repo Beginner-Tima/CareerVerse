@@ -18,11 +18,37 @@ export const SignalSchema = z.object({
 });
 
 export const AssessmentSchema = z.object({
+  // Первые два поля идут до выводов намеренно: модель сначала признаёт, что
+  // ответ пустой, и только потом пишет summary. В обратном порядке она сначала
+  // сочиняет содержательный пересказ, а потом уже не может назвать его пустым.
+  informative: z
+    .boolean()
+    .describe(
+      'Есть ли в ответе хоть что-то конкретное о самом человеке. ' +
+        '«Не знаю», «норм», «всё нравится», одно слово, ответ не по вопросу — false',
+    ),
+  missing: z
+    .string()
+    .describe(
+      'Если informative=false — чего именно не хватило, чтобы понять человека. ' +
+        'Если informative=true — пустая строка',
+    ),
   summary: z.string().describe('Одно предложение: что этот ответ говорит о человеке'),
   feedback: z
     .string()
     .describe('Обратная связь подростку на «ты», 2-3 предложения, без оценок и баллов'),
-  signals: z.array(SignalSchema).describe('От 1 до 4 сигналов интереса'),
+  signals: z
+    .array(SignalSchema)
+    .describe('От 1 до 4 сигналов интереса. Если ответ пустой — пустой массив, не выдумывай'),
+  enoughToMatch: z
+    .boolean()
+    .describe(
+      'Хватает ли всего накопленного, чтобы честно подобрать профессию, ' +
+        'или человек всё ещё раскрыт с одной стороны',
+    ),
+  confidence: z
+    .number()
+    .describe('Насколько ты уверен в профиле интересов прямо сейчас, от 0 до 1'),
 });
 export type AssessmentResult = z.infer<typeof AssessmentSchema>;
 
@@ -65,3 +91,58 @@ export const TrialSchema = z.object({
     .describe('По какому признаку видно, что человек справился — для оценки ответа'),
 });
 export type TrialResult = z.infer<typeof TrialSchema>;
+
+// Второй шаг пробы. Ценен именно тем, что вырастает из решения подростка:
+// это самое наглядное доказательство адаптивности — сценарий меняется от того,
+// что человек выбрал, а не переключается на следующий пункт списка.
+export const TrialFollowUpSchema = z.object({
+  reaction: z
+    .string()
+    .describe('Что произошло из-за его решения, 1-2 предложения — без похвалы и оценок'),
+  task: z.string().describe('Что теперь нужно сделать в изменившейся ситуации'),
+  materials: z
+    .array(z.string())
+    .describe('Новые вводные: что изменилось в цифрах, репликах, обстоятельствах'),
+  successLooksLike: z.string().describe('По какому признаку видно, что человек справился'),
+});
+export type TrialFollowUpResult = z.infer<typeof TrialFollowUpSchema>;
+
+// Разбор от наставника — то, на что тратятся очки. Структурой, а не сплошным
+// текстом: экран разбирает по полям, и модели труднее уплыть в общие слова.
+export const MentorReviewSchema = z.object({
+  didWell: z.string().describe('Что у человека получилось в пробе, со ссылкой на его слова'),
+  gaps: z
+    .string()
+    .describe('Чего не хватило — прямо, но без обесценивания. Это подросток, а не кандидат'),
+  monthPlan: z
+    .array(z.string())
+    .describe('3-4 конкретных шага на ближайший месяц, выполнимых в Казахстане'),
+  closing: z.string().describe('Одно предложение на «ты», с которым хочется продолжить'),
+});
+export type MentorReviewResult = z.infer<typeof MentorReviewSchema>;
+
+// «Что дальше» после результата: путь от школы до первой работы в профессии.
+export const NextStepsSchema = z.object({
+  entSubjects: z
+    .array(z.string())
+    .describe('Профильные предметы ЕНТ для этого направления'),
+  universities: z
+    .array(
+      z.object({
+        name: z.string().describe('Только реально существующие вузы и колледжи РК'),
+        city: z.string(),
+        why: z.string().describe('Чем это место подходит именно под эту профессию'),
+      }),
+    )
+    .describe('2-4 варианта. Не уверен, что программа существует — не называй её'),
+  languages: z
+    .string()
+    .describe('Нужен ли английский и IELTS в этой профессии и зачем именно — честно'),
+  toGetHired: z
+    .array(z.string())
+    .describe('Что реально спрашивают на входе в профессию в РК: навыки, портфолио, практика'),
+  nextMonth: z
+    .array(z.string())
+    .describe('2-3 шага, которые можно сделать в ближайший месяц, ничего не покупая'),
+});
+export type NextStepsResult = z.infer<typeof NextStepsSchema>;
