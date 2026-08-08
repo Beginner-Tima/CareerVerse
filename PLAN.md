@@ -76,7 +76,27 @@ cd web && vercel deploy --prod --yes  # фронт
   как `verify-full`, а сертификат Supabase подписан их собственным CA, которого
   нет в системном хранилище. Корневой сертификат лежит в `SUPABASE_CA_CERT`,
   проверка включена. Без переменной приложение работает, но пишет предупреждение.
-- **Миграции на прод:** `DATABASE_URL=<session-mode> npx prisma migrate deploy`.
+- **Миграции на прод идут не через Prisma, и это не лень.** Переменные на Vercel
+  помечены как sensitive: `vercel env pull` выгружает `DATABASE_URL=""`, значение
+  не отдаётся даже владельцу проекта. Строку подключения взять негде, поэтому
+  `prisma migrate deploy` на прод запустить нельзя. Рабочий путь — Management API
+  Supabase, где пароль не нужен:
+
+  ```sh
+  supabase link --project-ref ypgsswfqrpipawauxsbd
+  supabase db query --linked -f prisma/migrations/<имя>/migration.sql
+
+  # Prisma не узнает о применённой вручную миграции и попытается накатить её
+  # снова — допишем строку сами. checksum считается по файлу миграции:
+  #   shasum -a 256 prisma/migrations/<имя>/migration.sql
+  supabase db query --linked "insert into _prisma_migrations
+    (id, checksum, finished_at, migration_name, logs, rolled_back_at, started_at, applied_steps_count)
+    values (gen_random_uuid()::text, '<checksum>', now(), '<имя>', null, null, now(), 1)"
+  ```
+
+  Проверить, что применилось: `supabase db query --linked "select migration_name
+  from _prisma_migrations order by finished_at"`. Локально всё по-прежнему обычно:
+  `npx prisma migrate deploy`.
 
 ### Как посмотреть, что люди отвечали
 
