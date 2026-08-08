@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AiBadge } from '../components/AiBadge';
 import { ProfileBar } from '../components/ProfileBar';
 import {
@@ -13,6 +13,7 @@ import {
   type TrialPayload,
 } from '../lib/api';
 import { rememberExpectation } from '../lib/expectation';
+import { setUiLocale, useT } from '../lib/i18n';
 
 interface Exchange {
   question: string;
@@ -29,12 +30,17 @@ const GRADES = [7, 8, 9, 10, 11];
  * разбор ответа, потом следующий вопрос. Ничего не имитируем — просто называем
  * вслух то, что и так происходит.
  */
-const THINKING = ['Читаю ответ…', 'Ищу, что за этим стоит…', 'Придумываю следующий вопрос…'];
-const THINKING_TRIAL = ['Читаю решение…', 'Смотрю, к чему оно привело…', 'Меняю ситуацию…'];
+const THINKING = ['test.thinking1', 'test.thinking2', 'test.thinking3'] as const;
+const THINKING_TRIAL = [
+  'test.thinkingTrial1',
+  'test.thinkingTrial2',
+  'test.thinkingTrial3',
+] as const;
 const THINKING_STEP_MS = 4000;
 
 export default function TestPage() {
   const router = useRouter();
+  const t = useT();
   const [started, setStarted] = useState(false);
   const [grade, setGrade] = useState<number | null>(null);
   const [sessionId, setSessionId] = useState('');
@@ -47,6 +53,23 @@ export default function TestPage() {
   const [busy, setBusy] = useState(false);
   const [thinkingStep, setThinkingStep] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const feedbackRef = useRef<HTMLParagraphElement | null>(null);
+
+  /**
+   * Экран дорастает вниз, а человек остаётся там, где отвечал, — и нового
+   * вопроса просто не видит, пока не проскроллит сам. Ведём его сами.
+   *
+   * Целимся в разбор ответа, а не в сам вопрос: разбор встаёт под верх экрана,
+   * следующий вопрос оказывается прямо под ним, и видно оба. Если прицелиться в
+   * вопрос, разбор уедет вверх непрочитанным, а он и есть доказательство, что
+   * модель ответ прочитала.
+   *
+   * На первом вопросе не трогаем: позади пусто, и прыжок читался бы как сбой.
+   */
+  useEffect(() => {
+    if (history.length === 0) return;
+    feedbackRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [history.length]);
 
   // Подписи идут вперёд, пока ждём сервер, и замирают на последней: досрочно
   // объявлять «готово» нельзя, а бесконечно крутить по кругу — врать про прогресс.
@@ -63,9 +86,13 @@ export default function TestPage() {
 
   async function begin(locale: 'RU' | 'KK') {
     if (!grade) {
-      setError('Выбери класс — от него зависит, насколько сложной будет проба.');
+      setError(t('test.grade.error'));
       return;
     }
+    // Язык разговора выбирают здесь же, и он же становится языком оболочки:
+    // казахский вопрос в русской рамке — это ровно то, что мы чиним. Обратное
+    // тоже верно, «Начать на русском» вернёт русский интерфейс.
+    setUiLocale(locale === 'KK' ? 'kk' : 'ru');
     setBusy(true);
     setError(null);
     try {
@@ -116,20 +143,14 @@ export default function TestPage() {
       <main className="mx-auto max-w-2xl space-y-8 px-5 py-12">
         <div className="space-y-4">
           <h1 className="text-3xl font-semibold leading-tight text-zinc-100">
-            Прежде чем начать
+            {t('test.before')}
           </h1>
-          <p className="text-[15px] leading-relaxed text-zinc-400">
-            Разговор займёт минут десять. Сколько будет вопросов — заранее неизвестно:
-            он закончится, когда станет понятно, как ты думаешь.
-          </p>
+          <p className="text-[15px] leading-relaxed text-zinc-400">{t('test.intro')}</p>
         </div>
 
         <section className="space-y-3 rounded-2xl border border-white/10 bg-white/[0.03] p-5">
-          <h2 className="text-sm font-medium text-zinc-200">В каком ты классе?</h2>
-          <p className="text-sm leading-relaxed text-zinc-400">
-            Это не формальность: от класса зависит, насколько сложной будет рабочая
-            проба и о чём вообще имеет смысл говорить.
-          </p>
+          <h2 className="text-sm font-medium text-zinc-200">{t('test.grade.title')}</h2>
+          <p className="text-sm leading-relaxed text-zinc-400">{t('test.grade.note')}</p>
           <div className="flex flex-wrap gap-2 pt-1">
             {GRADES.map((g) => (
               <button
@@ -150,32 +171,22 @@ export default function TestPage() {
         {/* Спрашиваем до первого вопроса и не показываем модели: в конце будет
             видно, куда человек шёл сам и куда его привели собственные ответы. */}
         <section className="space-y-3 rounded-2xl border border-white/10 bg-white/[0.03] p-5">
-          <h2 className="text-sm font-medium text-zinc-200">
-            Кем ты сейчас думаешь стать?
-          </h2>
-          <p className="text-sm leading-relaxed text-zinc-400">
-            Одним словом, как есть — даже если пока не уверен. Это не ответ на тест
-            и модели не передаётся: мы сравним с результатом в конце.
-          </p>
+          <h2 className="text-sm font-medium text-zinc-200">{t('test.expect.title')}</h2>
+          <p className="text-sm leading-relaxed text-zinc-400">{t('test.expect.note')}</p>
           <input
             value={expectation}
             onChange={(e) => setExpectation(e.target.value)}
-            placeholder="Например: юрист. Или «не знаю» — тоже честно."
+            placeholder={t('test.expect.placeholder')}
             className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-[15px] text-zinc-100 outline-none transition placeholder:text-zinc-600 focus:border-emerald-500/50"
           />
         </section>
 
         <section className="space-y-3 rounded-2xl border border-white/10 bg-white/[0.03] p-5">
           <div className="flex items-center justify-between gap-3">
-            <h2 className="text-sm font-medium text-zinc-200">Про твои ответы</h2>
+            <h2 className="text-sm font-medium text-zinc-200">{t('test.ai.title')}</h2>
             <AiBadge />
           </div>
-          <p className="text-sm leading-relaxed text-zinc-400">
-            Вопросы и разбор твоих ответов создаёт искусственный интеллект. Ответы
-            сохраняются, чтобы собрать результат и письмо родителям. Это не диагноз и
-            не приговор — повод для разговора. Нажимая «Начать», ты соглашаешься на
-            обработку ответов моделью.
-          </p>
+          <p className="text-sm leading-relaxed text-zinc-400">{t('test.ai.note')}</p>
         </section>
 
         {error && <p className="text-sm text-rose-400">{error}</p>}
@@ -186,7 +197,7 @@ export default function TestPage() {
             onClick={() => begin('RU')}
             className="rounded-xl bg-emerald-500 px-6 py-3 font-medium text-emerald-950 transition hover:bg-emerald-400 disabled:opacity-50"
           >
-            {busy ? 'Секунду…' : 'Начать на русском'}
+            {busy ? t('test.busy') : t('test.startRu')}
           </button>
           <button
             disabled={busy}
@@ -210,34 +221,49 @@ export default function TestPage() {
       {progress && (
         <p className="text-xs uppercase tracking-widest text-zinc-500">
           {progress.stage === 'trial'
-            ? `Рабочая проба · шаг ${progress.trialStep ?? 1} из ${progress.trialSteps}`
-            : `Вопрос ${progress.asked + 1} · разговор идёт, пока не станет понятно`}
+            ? t('test.progress.trial', {
+                step: progress.trialStep ?? 1,
+                total: progress.trialSteps,
+              })
+            : t('test.progress.question', { n: progress.asked + 1 })}
         </p>
       )}
 
       <ProfileBar signals={profile} />
 
-      {history.map((h, i) => (
-        // Прошлые шаги приглушены, но остаются читаемыми: подросток должен
-        // видеть, что вопрос вырос из его же ответа.
-        <section key={i} className="space-y-3">
-          <p className="text-[15px] leading-relaxed text-zinc-500">{h.question}</p>
-          <p className="rounded-2xl bg-white/[0.06] px-4 py-3 text-[15px] leading-relaxed text-zinc-300">
-            {h.answer}
-          </p>
-          <p className="border-l-2 border-emerald-500/40 pl-4 text-sm leading-relaxed text-zinc-400">
-            {h.feedback}
-          </p>
-        </section>
-      ))}
+      {history.map((h, i) => {
+        // Появление вешаем только на последний блок: он единственный новый.
+        // Старые перерисовываются на каждый ответ, и анимируй их тоже — вся
+        // история мигала бы заново после каждого шага.
+        const last = i === history.length - 1;
+        return (
+          // Прошлые шаги приглушены, но остаются читаемыми: подросток должен
+          // видеть, что вопрос вырос из его же ответа.
+          <section key={i} className={`space-y-3${last ? ' enter-up' : ''}`}>
+            <p className="text-[15px] leading-relaxed text-zinc-500">{h.question}</p>
+            <p className="rounded-2xl bg-white/[0.06] px-4 py-3 text-[15px] leading-relaxed text-zinc-300">
+              {h.answer}
+            </p>
+            <p
+              ref={last ? feedbackRef : null}
+              className="border-l-2 border-emerald-500/40 pl-4 text-sm leading-relaxed text-zinc-400"
+            >
+              {h.feedback}
+            </p>
+          </section>
+        );
+      })}
 
       {task && (
-        <section className="space-y-4">
+        // Ключ по числу ответов, чтобы секция пересоздавалась на каждом шаге и
+        // проигрывала появление заново: без него React переиспользует тот же
+        // узел, класс остаётся на месте, и анимация играет ровно один раз.
+        <section key={history.length} className="space-y-4 enter-up">
           {trial && (
             <div className="space-y-3 rounded-2xl border border-emerald-500/20 bg-emerald-500/[0.04] p-5">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="text-xs uppercase tracking-widest text-emerald-400">
-                  {trial.step === 2 ? 'Что вышло из твоего решения' : 'Рабочая проба'} ·{' '}
+                  {trial.step === 2 ? t('test.trial.outcome') : t('test.trial.label')} ·{' '}
                   {trial.profession}
                 </p>
                 <AiBadge model={task.modelId} />
@@ -257,9 +283,7 @@ export default function TestPage() {
           {/* Переспрос показываем честно: человек должен понимать, что его не
               поняли, а не думать, что вопрос повторился по ошибке. */}
           {isRetry && (
-            <p className="text-xs text-amber-300/80">
-              Спрошу то же самое, но иначе — из прошлого ответа я ничего не понял.
-            </p>
+            <p className="text-xs text-amber-300/80">{t('test.retry')}</p>
           )}
 
           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -272,7 +296,7 @@ export default function TestPage() {
             onChange={(e) => setDraft(e.target.value)}
             disabled={busy}
             rows={5}
-            placeholder="Своими словами. Коротко — тоже нормально."
+            placeholder={t('test.placeholder')}
             className="w-full resize-none rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-[15px] leading-relaxed text-zinc-100 outline-none transition placeholder:text-zinc-600 focus:border-emerald-500/50 disabled:opacity-50"
           />
 
@@ -283,7 +307,7 @@ export default function TestPage() {
             disabled={busy || draft.trim().length === 0}
             className="rounded-xl bg-emerald-500 px-6 py-3 font-medium text-emerald-950 transition hover:bg-emerald-400 disabled:opacity-40"
           >
-            {busy ? (trial ? THINKING_TRIAL : THINKING)[thinkingStep] : 'Ответить'}
+            {busy ? t((trial ? THINKING_TRIAL : THINKING)[thinkingStep]) : t('test.answer')}
           </button>
         </section>
       )}

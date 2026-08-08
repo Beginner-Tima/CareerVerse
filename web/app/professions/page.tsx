@@ -26,13 +26,27 @@ export default function ProfessionsPage() {
       <header className="space-y-3">
         <h1 className="text-3xl font-semibold text-zinc-100">Каталог профессий</h1>
         <p className="max-w-xl text-[15px] leading-relaxed text-zinc-400">
-          Профессии, под которые собираются рабочие пробы. Зарплаты и вакансии — по
-          данным рынка труда Казахстана, с источником и датой выгрузки.
+          Профессии, под которые собираются рабочие пробы. Зарплаты — по данным рынка
+          труда Казахстана, с источником и датой выгрузки. Они есть не у всех: где
+          цифру не удалось собрать поимённо, её нет и на экране.
         </p>
       </header>
 
       {error && <p className="text-sm text-rose-400">{error}</p>}
-      {!items && !error && <p className="text-zinc-500">Загружаю каталог…</p>}
+
+      {!items && !error && (
+        <ul className="space-y-3" aria-busy="true">
+          {[0, 1, 2, 3].map((i) => (
+            <li
+              key={i}
+              className="space-y-3 rounded-2xl border border-white/10 bg-white/[0.03] p-5"
+            >
+              <div className="h-5 w-2/5 animate-pulse rounded bg-white/5" />
+              <div className="h-4 w-full animate-pulse rounded bg-white/5" />
+            </li>
+          ))}
+        </ul>
+      )}
 
       <ul className="space-y-3">
         {items?.map((p) => (

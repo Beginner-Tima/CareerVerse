@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import { HtmlLang } from './components/HtmlLang';
 import { TopBar } from './components/TopBar';
 
 export const metadata: Metadata = {
@@ -14,6 +15,7 @@ export default function RootLayout({
   return (
     <html lang="ru">
       <body className="min-h-dvh bg-zinc-950 text-zinc-100 antialiased">
+        <HtmlLang />
         <TopBar />
         {children}
       </body>

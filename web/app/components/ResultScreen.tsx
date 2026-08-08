@@ -15,6 +15,9 @@ import {
 } from '../lib/api';
 import { updateUser, useAuth } from '../lib/auth';
 import { compareExpectation, recallExpectation } from '../lib/expectation';
+import { rememberFace } from '../lib/face';
+import { useT } from '../lib/i18n';
+import { topTraitOf } from './TraitAvatar';
 
 const tenge = new Intl.NumberFormat('ru-KZ');
 
@@ -58,9 +61,15 @@ export function ResultScreen({ sessionId }: { sessionId: string }) {
   const [letterState, setLetterState] = useState<'idle' | 'streaming' | 'done'>('idle');
   const [claiming, setClaiming] = useState(false);
   const [claimed, setClaimed] = useState(false);
+  // Начисление показываем всплывающей плашкой: цифры в шапке меняются молча, и
+  // без этого момент, ради которого человек жал кнопку, проходит незамеченным.
+  // Само начисление тут ни при чём — оно как считалось на сервере, так и
+  // считается, здесь только его видно.
+  const [burst, setBurst] = useState<{ xp: number; coins: number } | null>(null);
   const [expectation, setExpectation] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const abort = useRef<AbortController | null>(null);
+  const t = useT();
 
   // Цепочка промисов, а не async-функция: состояние меняется только в
   // колбэках, поэтому вызов из эффекта не тянет каскад синхронных рендеров.
@@ -73,6 +82,9 @@ export function ResultScreen({ sessionId }: { sessionId: string }) {
           // localStorage есть только в браузере — читаем здесь, а не в рендере:
           // к этому моменту мы точно на клиенте.
           setExpectation(recallExpectation(sessionId));
+          // Тем же заходом запоминаем сильнейшую черту: по ней шапка на всех
+          // остальных экранах покажет тот же знак, что и здесь.
+          rememberFace(topTraitOf(r.profile));
           setError(null);
         })
         .catch((e: unknown) => setError(humanError(e)))
@@ -116,13 +128,20 @@ export function ResultScreen({ sessionId }: { sessionId: string }) {
       const res = await claimSession(sessionId, token);
       updateUser(res.user);
       setClaimed(true);
+      const gained = result?.reward;
+      if (gained) {
+        setBurst({ xp: gained.xp, coins: gained.coins });
+        // Столько же длится сама анимация — плашка снимается ровно тогда, когда
+        // догорела, и не остаётся в разметке невидимым мусором.
+        setTimeout(() => setBurst(null), 1800);
+      }
       await refresh();
     } catch (e) {
       setError(humanError(e));
     } finally {
       setClaiming(false);
     }
-  }, [sessionId, token, refresh]);
+  }, [sessionId, token, refresh, result]);
 
   // Раньше любой обрыв сети превращал экран результата в тупик: одна попытка,
   // ошибка на английском и никакого выхода, кроме перезагрузки страницы.
@@ -144,7 +163,36 @@ export function ResultScreen({ sessionId }: { sessionId: string }) {
       </div>
     );
   }
-  if (!result) return <p className="text-zinc-500">Собираем результат…</p>;
+  // Подбор идёт секундами, и одна строчка на пустом экране читается как
+  // зависание. Скелет показывает форму того, что появится, — три карточки,
+  // столько модель и просят вернуть, — и подпись остаётся на месте.
+  if (!result) {
+    return (
+      <div className="space-y-10" aria-busy="true">
+        <header className="space-y-3">
+          <p className="text-xs uppercase tracking-widest text-emerald-400">
+            {t('result.kicker')}
+          </p>
+          <div className="h-8 w-56 animate-pulse rounded-lg bg-white/5" />
+        </header>
+
+        <ol className="space-y-4">
+          {[0, 1, 2].map((i) => (
+            <li
+              key={i}
+              className="space-y-3 rounded-2xl border border-white/10 bg-white/[0.03] p-5"
+            >
+              <div className="h-5 w-1/2 animate-pulse rounded bg-white/5" />
+              <div className="h-4 w-full animate-pulse rounded bg-white/5" />
+              <div className="h-4 w-4/5 animate-pulse rounded bg-white/5" />
+            </li>
+          ))}
+        </ol>
+
+        <p className="text-sm text-zinc-500">{t('result.loading')}</p>
+      </div>
+    );
+  }
 
   const verdict = expectation
     ? compareExpectation(
@@ -159,7 +207,7 @@ export function ResultScreen({ sessionId }: { sessionId: string }) {
     <div className="space-y-10">
       <header className="space-y-3">
         <p className="text-xs uppercase tracking-widest text-emerald-400">Результат пробы</p>
-        <h1 className="text-3xl font-semibold text-zinc-100">Куда это смотрит</h1>
+        <h1 className="text-3xl font-semibold text-zinc-100">{t('result.title')}</h1>
         <ProfileBar signals={result.profile} />
       </header>
 
@@ -190,9 +238,13 @@ export function ResultScreen({ sessionId }: { sessionId: string }) {
 
       <ol className="space-y-4">
         {result.matches.map((m, i) => (
+          // Карточки выезжают по очереди, а не разом: список ранжированный, и
+          // задержка проговаривает порядок — первое совпадение появляется
+          // первым. Шаг маленький, вся тройка на месте меньше чем за полсекунды.
           <li
             key={m.profession?.id ?? i}
-            className="rounded-2xl border border-white/10 bg-white/[0.03] p-5"
+            className="enter-up rounded-2xl border border-white/10 bg-white/[0.03] p-5"
+            style={{ animationDelay: `${i * 90}ms` }}
           >
             <div className="flex items-baseline justify-between gap-4">
               <h2 className="text-lg font-medium text-zinc-100">
@@ -207,7 +259,7 @@ export function ResultScreen({ sessionId }: { sessionId: string }) {
             {m.labourMarket && (
               <dl className="mt-4 grid grid-cols-2 gap-3 border-t border-white/5 pt-4 text-sm sm:grid-cols-3">
                 <div>
-                  <dt className="text-xs text-zinc-500">медианная зарплата</dt>
+                  <dt className="text-xs text-zinc-500">{t('result.market.salary')}</dt>
                   <dd className="text-zinc-200">
                     {m.labourMarket.medianSalaryKzt
                       ? `${tenge.format(m.labourMarket.medianSalaryKzt)} ₸`
@@ -231,12 +283,14 @@ export function ResultScreen({ sessionId }: { sessionId: string }) {
                 )}
                 {m.labourMarket.regions && (
                   <div className="col-span-2 sm:col-span-3">
-                    <dt className="text-xs text-zinc-500">где искать</dt>
+                    <dt className="text-xs text-zinc-500">{t('result.market.where')}</dt>
                     <dd className="text-zinc-200">{m.labourMarket.regions.join(', ')}</dd>
                   </div>
                 )}
                 <div className="col-span-2 sm:col-span-3">
-                  <dd className="text-xs text-zinc-500">Источник: {m.labourMarket.source}</dd>
+                  <dd className="text-xs text-zinc-500">
+                    {t('result.market.source', { source: m.labourMarket.source })}
+                  </dd>
                 </div>
               </dl>
             )}
@@ -287,7 +341,15 @@ export function ResultScreen({ sessionId }: { sessionId: string }) {
           Дальше — что с этим делать, и только потом всё остальное. */}
       <CareerPlan sessionId={sessionId} profession={result.matches[0]?.profession?.title} />
 
-      <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+      <section className="relative rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+        {burst && (
+          <span
+            role="status"
+            className="float-away pointer-events-none absolute right-5 top-5 rounded-full bg-emerald-500/20 px-3 py-1 text-sm font-medium text-emerald-300"
+          >
+            +{burst.xp} XP · +{burst.coins} очков
+          </span>
+        )}
         <h2 className="text-lg font-medium text-zinc-100">
           {claimed ? 'Прохождение сохранено' : 'Сохрани результат и получи очки'}
         </h2>

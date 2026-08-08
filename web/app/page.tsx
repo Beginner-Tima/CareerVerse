@@ -2,50 +2,35 @@
 
 import Link from 'next/link';
 import { useAuth } from './lib/auth';
+import { useT } from './lib/i18n';
 
 /**
  * Главное меню. Три пункта, и все три работают: серая кнопка «скоро» на защите
  * притягивает жюри сильнее рабочего экрана, поэтому магазина здесь нет.
+ *
+ * Хранятся ключи, а не подписи: язык переключается на лету, и захардкоженная
+ * строка осталась бы русской посреди казахского экрана.
  */
 const MENU = [
-  {
-    href: '/test',
-    title: 'Пройти пробу',
-    lead: 'Разговор без вариантов ответа и кусок настоящей работы в конце',
-    accent: true,
-  },
-  {
-    href: '/professions',
-    title: 'Каталог профессий',
-    lead: 'Чем занимаются, сколько платят и где есть вакансии в Казахстане',
-    accent: false,
-  },
-  {
-    href: '/me',
-    title: 'Мои прохождения',
-    lead: 'Результаты, очки и разборы от наставника',
-    accent: false,
-  },
-];
+  { href: '/test', key: 'test', accent: true },
+  { href: '/professions', key: 'catalog', accent: false },
+  { href: '/me', key: 'me', accent: false },
+] as const;
 
 export default function Home() {
   const { user } = useAuth();
+  const t = useT();
 
   return (
     <main className="mx-auto max-w-3xl space-y-10 px-5 py-12">
       <section className="space-y-4">
         <p className="text-xs uppercase tracking-widest text-emerald-400">CareerVerse</p>
         <h1 className="text-4xl font-semibold leading-tight text-zinc-100">
-          {user?.name ? `Привет, ${user.name}.` : 'Не тест с вариантами.'}
+          {user?.name ? t('home.greeting', { name: user.name }) : t('home.titleA')}
           <br />
-          Разговор и рабочая проба.
+          {t('home.titleB')}
         </h1>
-        <p className="max-w-xl text-[15px] leading-relaxed text-zinc-400">
-          Здесь нет ключа ответов. Ты отвечаешь своими словами, следующий вопрос
-          рождается из предыдущего, а в конце видишь, к какой работе это ближе и
-          что с ней происходит на рынке труда Казахстана. Захочешь проверить —
-          сможешь сделать кусок этой работы сам.
-        </p>
+        <p className="max-w-xl text-[15px] leading-relaxed text-zinc-400">{t('home.lead')}</p>
       </section>
 
       <nav className="grid gap-3 sm:grid-cols-2">
@@ -65,7 +50,7 @@ export default function Home() {
                   item.accent ? 'text-emerald-300' : 'text-zinc-100'
                 }`}
               >
-                {item.title}
+                {t(`home.${item.key}.title`)}
               </h2>
               <span
                 aria-hidden
@@ -74,15 +59,16 @@ export default function Home() {
                 →
               </span>
             </div>
-            <p className="mt-1.5 text-sm leading-relaxed text-zinc-400">{item.lead}</p>
+            <p className="mt-1.5 text-sm leading-relaxed text-zinc-400">
+              {t(`home.${item.key}.lead`)}
+            </p>
           </Link>
         ))}
       </nav>
 
       {user && (
         <p className="text-sm text-zinc-500">
-          У тебя {user.coins} очков и {user.xp} XP, уровень {user.level}. Очки тратятся
-          на разбор рабочей пробы наставником.
+          {t('home.stats', { coins: user.coins, xp: user.xp, level: user.level })}
         </p>
       )}
     </main>
