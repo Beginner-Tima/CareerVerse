@@ -83,11 +83,21 @@ export interface Reward {
   mentorCost: number;
 }
 
+/** Проба не входит в тест — экран результата решает, предлагать её или нет. */
+export interface TrialState {
+  done: boolean;
+  steps: number;
+  answered: number;
+  rewardXp: number;
+  rewardCoins: number;
+}
+
 export interface ResultResponse {
   sessionId: string;
   grade: number | null;
   claimed: boolean;
   reward: Reward;
+  trial: TrialState;
   profile: Signal[];
   confidence: number;
   matches: Match[];
@@ -184,6 +194,12 @@ export const submitAnswer = (sessionId: string, text: string) =>
 
 export const getResult = (sessionId: string) =>
   fetch(`${API}/sessions/${sessionId}/result`).then(json<ResultResponse>);
+
+export const startTrial = (sessionId: string) =>
+  fetch(`${API}/sessions/${sessionId}/trial`, {
+    method: 'POST',
+    headers: headers(),
+  }).then(json<{ task: Task; progress: Progress }>);
 
 export const claimSession = (sessionId: string, token: string) =>
   fetch(`${API}/sessions/${sessionId}/claim`, {

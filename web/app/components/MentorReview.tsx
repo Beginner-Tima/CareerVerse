@@ -13,10 +13,12 @@ import { useAuth } from '../lib/auth';
 export function MentorReview({
   sessionId,
   claimed,
+  trialDone,
   cost,
 }: {
   sessionId: string;
   claimed: boolean;
+  trialDone: boolean;
   cost: number;
 }) {
   const { token, user, refresh } = useAuth();
@@ -54,7 +56,12 @@ export function MentorReview({
 
       {!review && (
         <div className="mt-4">
-          {!claimed ? (
+          {!trialDone ? (
+            <p className="text-sm text-zinc-500">
+              Разбирать пока нечего: наставник смотрит на то, как ты решал рабочую пробу.
+              Пройди её — и возвращайся.
+            </p>
+          ) : !claimed ? (
             <p className="text-sm text-zinc-500">
               Сначала сохрани прохождение — разбор делается по своему результату.
             </p>

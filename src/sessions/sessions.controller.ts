@@ -55,6 +55,23 @@ export class SessionsController {
     return this.sessions.result(id);
   }
 
+  // Проба не входит в тест: разговор заканчивается результатом, а сюда человек
+  // приходит сам, с экрана результата, если захотел попробовать работу руками.
+  @Public()
+  @Post(':id/trial')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Начать рабочую пробу по подобранной профессии',
+    description:
+      'Возвращает первый шаг пробы. Если проба уже идёт — отдаёт текущий шаг, а не создаёт новый.',
+  })
+  @ApiParam({ name: 'id', description: 'UUID сессии' })
+  @ApiResponse({ status: 200, description: 'Проба началась, первый шаг выдан.' })
+  @ApiResponse({ status: 409, description: 'Разговор не пройден или проба уже завершена.' })
+  startTrial(@Param('id', ParseUUIDPipe) id: string) {
+    return this.sessions.startTrial(id);
+  }
+
   // Единственный роут прохождения за токеном — и осознанно: это уже не «пройти
   // тест», а «положить результат себе в аккаунт и получить за него очки».
   @Post(':id/claim')

@@ -122,6 +122,33 @@ export function ResultScreen({ sessionId }: { sessionId: string }) {
         ))}
       </ol>
 
+      {/* Проба вынесена из теста: разговор заканчивается результатом, а работу
+          руками человек пробует по своему выбору — уже зная, что ему подобрали. */}
+      {!result.trial.done && (
+        <section className="rounded-2xl border border-emerald-500/30 bg-emerald-500/[0.06] p-5">
+          <h2 className="text-lg font-medium text-emerald-300">
+            {result.trial.answered > 0 ? 'Проба не закончена' : 'А каково это на самом деле?'}
+          </h2>
+          <p className="mt-2 text-sm leading-relaxed text-zinc-300">
+            {result.matches[0]?.profession?.title
+              ? `Пять минут настоящей работы: ${result.matches[0].profession.title.toLowerCase()}. `
+              : 'Пять минут настоящей работы. '}
+            Не викторина — реальная ситуация, где надо принять решение и объяснить его.
+            Всё нужное будет дано на экране.
+          </p>
+          <Link
+            href={`/trial/${sessionId}`}
+            className="mt-4 inline-block rounded-xl bg-emerald-500 px-5 py-2.5 text-sm font-medium text-emerald-950 transition hover:bg-emerald-400"
+          >
+            {result.trial.answered > 0 ? 'Продолжить пробу' : 'Попробовать'}
+          </Link>
+          <p className="mt-3 text-xs text-zinc-500">
+            Займёт пару минут и даст ещё {result.trial.rewardCoins} очков — как раз на
+            разбор от наставника.
+          </p>
+        </section>
+      )}
+
       {/* Раньше результат был тупиком: человек дочитывал и закрывал вкладку.
           Дальше — что с этим делать, и только потом всё остальное. */}
       <CareerPlan sessionId={sessionId} profession={result.matches[0]?.profession?.title} />
@@ -168,7 +195,12 @@ export function ResultScreen({ sessionId }: { sessionId: string }) {
         {error && <p className="mt-3 text-sm text-rose-400">{error}</p>}
       </section>
 
-      <MentorReview sessionId={sessionId} claimed={claimed} cost={result.reward.mentorCost} />
+      <MentorReview
+        sessionId={sessionId}
+        claimed={claimed}
+        trialDone={result.trial.answered > 0}
+        cost={result.reward.mentorCost}
+      />
 
       <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">

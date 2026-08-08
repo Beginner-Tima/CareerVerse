@@ -227,6 +227,15 @@ export class SessionsService {
       grade: session.grade,
       claimed: session.claimedAt !== null,
       reward: this.rewardFor(session),
+      // Проба необязательна, и экран результата должен знать, что предлагать:
+      // «попробуй» тому, кто ещё не пробовал, и ничего — тому, кто уже прошёл.
+      trial: {
+        done: this.answeredTrials(session).length >= TRIAL_ROUNDS,
+        steps: TRIAL_ROUNDS,
+        answered: this.answeredTrials(session).length,
+        rewardXp: REWARD_TRIAL_XP * TRIAL_ROUNDS,
+        rewardCoins: REWARD_TRIAL_COINS * TRIAL_ROUNDS,
+      },
       profile: this.signalsOf(session.interestProfile?.traits),
       confidence: session.interestProfile?.confidence ?? 0,
       matches: matches.map((m) => {
@@ -596,21 +605,51 @@ export class SessionsService {
       };
     }
 
+    // Вопросы закончились — подбираем профессии и показываем результат.
+    // Проба дальше не обязательна: человек уже получил ответ и решает сам,
+    // хочет ли он попробовать эту работу руками.
+    await this.matchAndComplete(session, learner, dialogue, signals);
     return {
-      task: await this.createTrialTask(session, learner, dialogue, signals, nextOrder),
-      finished: false,
-      progress: this.progressView(session, { stage: 'trial', trialStep: 1 }),
+      task: null,
+      finished: true,
+      progress: this.progressView(session, { stage: 'done', asked, informative }),
     };
   }
 
-  /** Подбирает профессии под профиль и генерирует рабочую пробу под первую. */
-  private async createTrialTask(
+  /**
+   * Конец разговора: подобрать профессии и закрыть сессию. Проба сюда не входит —
+   * матчинг всегда делался по диалогу, а не по ней, так что результат честный
+   * и без пробы.
+   */
+  private async matchAndComplete(
     session: SessionWithRelations,
     learner: Learner,
     dialogue: DialogueTurn[],
     signals: Signal[],
-    order: number,
   ) {
+    const valid = await this.matchProfessions(session, learner, dialogue, signals);
+
+    await this.prisma.$transaction([
+      this.prisma.interestProfile.update({
+        where: { sessionId: session.id },
+        data: { topProfessions: valid as unknown as Prisma.InputJsonValue },
+      }),
+      this.prisma.session.update({
+        where: { id: session.id },
+        data: { status: SessionStatus.COMPLETED, completedAt: new Date() },
+      }),
+    ]);
+
+    return valid;
+  }
+
+  /** Сопоставление профиля с каталогом. Названия — на языке прохождения. */
+  private async matchProfessions(
+    session: SessionWithRelations,
+    learner: Learner,
+    dialogue: DialogueTurn[],
+    signals: Signal[],
+  ): Promise<StoredMatch[]> {
     const stored = await this.prisma.profession.findMany({
       orderBy: { order: 'asc' },
       select: { id: true, title: true, titleKk: true, description: true },
@@ -637,42 +676,105 @@ export class SessionsService {
         'Не удалось подобрать профессию из каталога — попробуй пройти тест ещё раз.',
       );
     }
+    return valid;
+  }
 
-    const top = valid[0];
-    const profession = catalog.find((p) => p.id === top.professionId)!;
+  /**
+   * Первый шаг рабочей пробы — по кнопке с экрана результата, а не автоматом.
+   * Тест отвечает на вопрос «куда смотреть»; проба отвечает на другой —
+   * «а каково это на самом деле», и идти в неё человек решает сам.
+   */
+  async startTrial(sessionId: string) {
+    const session = await this.loadSession(sessionId);
+    const matches = this.matchesOf(session.interestProfile?.topProfessions);
 
+    if (matches.length === 0) {
+      throw new ConflictException('Сначала пройди разговор — пробу подбирать не под что.');
+    }
+
+    const open = session.tasks.find((t) => t.answer === null);
+    if (open) {
+      // Проба уже идёт: возвращаем текущий шаг, а не плодим новый.
+      return {
+        task: this.viewTask(open),
+        progress: this.progressView(session, {
+          stage: 'trial',
+          trialStep: this.answeredTrials(session).length + 1,
+        }),
+      };
+    }
+    if (this.answeredTrials(session).length >= TRIAL_ROUNDS) {
+      throw new ConflictException('Эта проба уже пройдена.');
+    }
+
+    const learner = this.learnerOf(session);
+    const order = session.tasks.length;
+    const task = await this.createTrialTask(
+      session,
+      learner,
+      this.dialogueOf(session.tasks),
+      this.signalsOf(session.interestProfile?.traits),
+      matches[0].professionId,
+      order,
+    );
+
+    // Проба — это снова работа, поэтому сессия возвращается в IN_PROGRESS:
+    // ответы на неё принимает тот же submitAnswer.
+    await this.prisma.session.update({
+      where: { id: session.id },
+      data: { status: SessionStatus.IN_PROGRESS },
+    });
+
+    return {
+      task,
+      progress: this.progressView(session, { stage: 'trial', trialStep: 1 }),
+    };
+  }
+
+  /** Генерирует рабочую пробу под уже подобранную профессию. */
+  private async createTrialTask(
+    session: SessionWithRelations,
+    learner: Learner,
+    dialogue: DialogueTurn[],
+    signals: Signal[],
+    professionId: string,
+    order: number,
+  ) {
+    const stored = await this.prisma.profession.findUnique({
+      where: { id: professionId },
+      select: { id: true, title: true, titleKk: true, description: true },
+    });
+    if (!stored) {
+      throw new NotFoundException('Профессия из подбора больше не найдена в каталоге.');
+    }
+
+    const title = this.titleOf(stored, session.locale);
     const trial = await this.claude.generateTrial(learner, {
-      professionTitle: profession.title,
-      professionDescription: profession.description,
+      professionTitle: title,
+      professionDescription: stored.description,
       signals,
       dialogue,
     });
 
-    const [task] = await this.prisma.$transaction([
-      this.prisma.taskInstance.create({
-        data: {
-          sessionId: session.id,
-          kind: TaskKind.PROFESSION_TRIAL,
-          order,
-          professionId: profession.id,
-          prompt: trial.task,
-          payload: {
-            title: trial.title,
-            scenario: trial.scenario,
-            materials: trial.materials,
-            successLooksLike: trial.successLooksLike,
-            profession: profession.title,
-            step: 1,
-            totalSteps: TRIAL_ROUNDS,
-          },
-          modelId: this.claude.modelFor(session.locale),
+    const task = await this.prisma.taskInstance.create({
+      data: {
+        sessionId: session.id,
+        kind: TaskKind.PROFESSION_TRIAL,
+        order,
+        professionId: stored.id,
+        prompt: trial.task,
+        payload: {
+          title: trial.title,
+          scenario: trial.scenario,
+          materials: trial.materials,
+          successLooksLike: trial.successLooksLike,
+          profession: title,
+          step: 1,
+          totalSteps: TRIAL_ROUNDS,
         },
-      }),
-      this.prisma.interestProfile.update({
-        where: { sessionId: session.id },
-        data: { topProfessions: valid as unknown as Prisma.InputJsonValue },
-      }),
-    ]);
+        modelId: this.claude.modelFor(session.locale),
+      },
+    });
 
     return this.viewTask(task);
   }
